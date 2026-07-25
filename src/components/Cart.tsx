@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Tag, Check, X as XIcon } from 'lucide-react';
-import { useStore, getColorLabel, getProductImages } from '../store/useStore';
+import { useStore, getColorLabel, getProductImages, getStock } from '../store/useStore';
 
 export default function Cart() {
   const {
@@ -111,8 +111,12 @@ export default function Cart() {
                           </button>
                           <span className="w-6 text-center text-sm font-bold font-cairo">{item.quantity}</span>
                           <button
-                            onClick={() => updateCartQty(item.product.id, item.size, item.color, item.quantity + 1)}
-                            className="w-6 h-6 flex items-center justify-center bg-pink-50 border border-pink-200 rounded-md hover:bg-pink-100 transition-all text-pink-600"
+                            onClick={() => {
+                              const maxStock = getStock(item.product, item.size as string, item.color);
+                              if (item.quantity < maxStock) updateCartQty(item.product.id, item.size, item.color, item.quantity + 1);
+                            }}
+                            disabled={item.quantity >= getStock(item.product, item.size as string, item.color)}
+                            className="w-6 h-6 flex items-center justify-center bg-pink-50 border border-pink-200 rounded-md hover:bg-pink-100 transition-all text-pink-600 disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-3 h-3" />
                           </button>

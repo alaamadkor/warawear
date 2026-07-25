@@ -2052,10 +2052,15 @@ export default function AdminPage() {
                     <div className="flex gap-2 flex-wrap">
                       {SIZES.map(size => (
                         <button key={size} type="button"
-                          onClick={() => setProductForm(f => ({
-                            ...f,
-                            sizes: f.sizes.includes(size) ? f.sizes.filter(s => s !== size) : [...f.sizes, size]
-                          }))}
+                          onClick={() => setProductForm(f => {
+                            const removing = f.sizes.includes(size);
+                            const newSizes = removing ? f.sizes.filter(s => s !== size) : [...f.sizes, size];
+                            const newStock = { ...f.stock };
+                            if (removing) {
+                              for (const c of f.colors) { delete newStock[`${size}|${c}`]; }
+                            }
+                            return { ...f, sizes: newSizes, stock: newStock };
+                          })}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold font-cairo border-2 transition-all ${
                             productForm.sizes.includes(size) ? 'bg-pink-500 text-white border-pink-500' : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'
                           }`}
@@ -2070,10 +2075,15 @@ export default function AdminPage() {
                     <div className="flex gap-2 flex-wrap">
                       {AGE_SIZES.map(age => (
                         <button key={age} type="button"
-                          onClick={() => setProductForm(f => ({
-                            ...f,
-                            sizes: f.sizes.includes(age) ? f.sizes.filter(s => s !== age) : [...f.sizes, age]
-                          }))}
+                          onClick={() => setProductForm(f => {
+                            const removing = f.sizes.includes(age);
+                            const newSizes = removing ? f.sizes.filter(s => s !== age) : [...f.sizes, age];
+                            const newStock = { ...f.stock };
+                            if (removing) {
+                              for (const c of f.colors) { delete newStock[`${age}|${c}`]; }
+                            }
+                            return { ...f, sizes: newSizes, stock: newStock };
+                          })}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold font-cairo border-2 transition-all ${
                             productForm.sizes.includes(age) ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
                           }`}
@@ -2274,7 +2284,13 @@ export default function AdminPage() {
                             const newColors = productForm.colors.filter((_, i) => i !== idx);
                             const newLabels = { ...productForm.colorLabels };
                             delete newLabels[c];
-                            setProductForm(f => ({ ...f, colors: newColors, colorLabels: newLabels }));
+                            const newStock = { ...productForm.stock };
+                            for (const s of productForm.sizes) {
+                              delete newStock[`${s}|${c}`];
+                            }
+                            const newColorImages = { ...productForm.colorImages };
+                            delete newColorImages[c];
+                            setProductForm(f => ({ ...f, colors: newColors, colorLabels: newLabels, stock: newStock, colorImages: newColorImages }));
                           }}
                             className="text-red-400 hover:text-red-600 transition-all">
                             <X className="w-3.5 h-3.5" />
