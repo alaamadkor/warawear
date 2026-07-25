@@ -27,13 +27,45 @@ export interface Product {
   colors: string[];
   colorLabels?: Record<string, string>;
   images: string[];
+  colorImages?: Record<string, string[]>;
   description: string;
-  stock: number;
+  stock: Record<string, number>;
   rating: number;
   reviews: Review[];
   featured: boolean;
   newArrival: boolean;
   createdAt: string;
+}
+
+export function stockKey(size: string, color: string): string {
+  return `${size}|${color}`;
+}
+
+export function getStock(product: Product, size: string, color: string): number {
+  return product.stock[stockKey(size, color)] ?? 0;
+}
+
+export function getTotalStock(product: Product): number {
+  return Object.values(product.stock).reduce((a, b) => a + b, 0);
+}
+
+export function getAvailableSizes(product: Product, color?: string): string[] {
+  return product.sizes.filter(s => {
+    if (color) return getStock(product, s, color) > 0;
+    return product.colors.some(c => getStock(product, s, c) > 0);
+  });
+}
+
+export function getAvailableColors(product: Product, size?: string): string[] {
+  return product.colors.filter(c => {
+    if (size) return getStock(product, size, c) > 0;
+    return product.sizes.some(s => getStock(product, s, c) > 0);
+  });
+}
+
+export function getProductImages(product: Product, color?: string): string[] {
+  if (color && product.colorImages?.[color]?.length) return product.colorImages[color];
+  return product.images;
 }
 
 export function getColorLabel(color: string, product?: Product): string {
@@ -250,7 +282,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'قميص كاجوال أنيق مصنوع من القطن الخالص 100%، مثالي للإطلالات اليومية العصرية.',
-    stock: 25,
+    stock: { 'S|#ffffff': 5, 'S|#1a1a2e': 3, 'M|#ffffff': 8, 'M|#1a1a2e': 6, 'M|#4a90d9': 4, 'L|#ffffff': 5, 'L|#1a1a2e': 2, 'XL|#ffffff': 3 },
     rating: 4.5,
     reviews: [],
     featured: true,
@@ -269,7 +301,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/8311880/pexels-photo-8311880.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'فستان سهرة فاخر بتصميم عصري يناسب المناسبات الخاصة والحفلات.',
-    stock: 15,
+    stock: { 'XS|#c0392b': 2, 'S|#c0392b': 4, 'S|#2c3e50': 3, 'M|#c0392b': 3, 'M|#8e44ad': 3, 'L|#2c3e50': 2 },
     rating: 4.8,
     reviews: [],
     featured: true,
@@ -288,7 +320,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'تراكسوت رياضي عالي الجودة مصنوع من أقمشة تقنية تمتص العرق.',
-    stock: 30,
+    stock: { 'S|#27ae60': 3, 'S|#2980b9': 2, 'M|#27ae60': 5, 'M|#2980b9': 4, 'M|#e74c3c': 3, 'L|#27ae60': 4, 'L|#e74c3c': 3, 'XL|#2980b9': 3, 'XL|#e74c3c': 2, 'XXL|#27ae60': 1 },
     rating: 4.3,
     reviews: [],
     featured: false,
@@ -307,7 +339,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/8386666/pexels-photo-8386666.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'جاكيت جينز بتصميم عصري مناسب لجميع الأوقات.',
-    stock: 20,
+    stock: { 'XS|#1a5276': 2, 'S|#1a5276': 4, 'S|#7f8c8d': 3, 'M|#1a5276': 3, 'M|#7f8c8d': 3, 'L|#7f8c8d': 3, 'XL|#1a5276': 2 },
     rating: 4.6,
     reviews: [],
     featured: true,
@@ -326,7 +358,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/35045845/pexels-photo-35045845.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'بنطلون كاجوال مريح للأطفال من أقمشة ناعمة وعالية الجودة.',
-    stock: 40,
+    stock: { 'XS|#3498db': 5, 'XS|#e74c3c': 4, 'S|#3498db': 6, 'S|#2ecc71': 5, 'M|#3498db': 5, 'M|#e74c3c': 5, 'M|#2ecc71': 5 },
     rating: 4.2,
     reviews: [],
     featured: false,
@@ -345,7 +377,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/8307678/pexels-photo-8307678.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'حقيبة يد فاخرة من الجلد الطبيعي بتصميم أنيق يناسب جميع المناسبات.',
-    stock: 10,
+    stock: { 'M|#8B4513': 4, 'M|#1a1a1a': 3, 'M|#c0c0c0': 3 },
     rating: 4.9,
     reviews: [],
     featured: true,
@@ -364,7 +396,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'تيشرت أوفرسايز عصري مريح للاستخدام اليومي والخروجات.',
-    stock: 50,
+    stock: { 'M|#ffffff': 8, 'M|#000000': 6, 'M|#e74c3c': 4, 'M|#3498db': 4, 'L|#ffffff': 7, 'L|#000000': 5, 'L|#e74c3c': 3, 'XL|#ffffff': 5, 'XL|#000000': 4, 'XL|#3498db': 4, 'XXL|#000000': 3, 'XXL|#ffffff': 3 },
     rating: 4.4,
     reviews: [],
     featured: false,
@@ -383,7 +415,7 @@ const sampleProducts: Product[] = [
       'https://images.pexels.com/photos/8387127/pexels-photo-8387127.jpeg?auto=compress&cs=tinysrgb&w=600',
     ],
     description: 'عباية فاخرة بتطريز يدوي ملكي من أجود أنواع الأقمشة.',
-    stock: 12,
+    stock: { 'S|#000000': 3, 'S|#2c3e50': 2, 'M|#000000': 4, 'M|#6c3483': 3, 'L|#2c3e50': 2, 'L|#6c3483': 2, 'XL|#000000': 1 },
     rating: 4.7,
     reviews: [],
     featured: true,
@@ -651,9 +683,14 @@ export const useStore = create<StoreState>()(
               )
             : state.users;
           const updatedProducts = state.products.map(p => {
-            const orderedItem = order.items.find(i => i.product.id === p.id);
-            if (orderedItem) {
-              return { ...p, stock: Math.max(0, p.stock - orderedItem.quantity) };
+            const orderedItems = order.items.filter(i => i.product.id === p.id);
+            if (orderedItems.length > 0) {
+              const newStock = { ...p.stock };
+              for (const item of orderedItems) {
+                const key = stockKey(item.size as string, item.color);
+                newStock[key] = Math.max(0, (newStock[key] ?? 0) - item.quantity);
+              }
+              return { ...p, stock: newStock };
             }
             return p;
           });
@@ -756,7 +793,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'wara-wear-storage',
-      version: 5,
+      version: 6,
       migrate: (persisted: any) => {
         if (!persisted.siteSettings?.heroBadge) {
           persisted.siteSettings = {
@@ -819,6 +856,25 @@ export const useStore = create<StoreState>()(
             if (u.email === 'admin@warawear.com') { u.email = 'admin@admin.com'; u.password = '123456'; }
             if (!u.role) u.role = 'admin';
             return u;
+          });
+        }
+        if (persisted.products) {
+          persisted.products = persisted.products.map((p: any) => {
+            if (typeof p.stock === 'number') {
+              const newStock: Record<string, number> = {};
+              const total = p.stock;
+              const sizes = p.sizes || [];
+              const colors = p.colors || ['#000000'];
+              const perCombo = sizes.length > 0 && colors.length > 0 ? Math.ceil(total / (sizes.length * colors.length)) : 0;
+              for (const s of sizes) {
+                for (const c of colors) {
+                  newStock[`${s}|${c}`] = perCombo;
+                }
+              }
+              p.stock = newStock;
+            }
+            if (!p.colorImages) p.colorImages = {};
+            return p;
           });
         }
         return persisted as any;

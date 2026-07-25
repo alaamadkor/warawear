@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, ShoppingCart, Plus, Minus, Share2, ChevronLeft, ChevronRight, X, Link, MessageCircle
 } from 'lucide-react';
-import { useStore, Size, getColorLabel } from '../store/useStore';
+import { useStore, Size, getColorLabel, getAvailableSizes, getAvailableColors, getStock, getProductImages } from '../store/useStore';
 
 interface Props { productId: string; }
 
@@ -37,9 +37,15 @@ export default function ProductDetailPage({ productId }: Props) {
   const discount = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) : 0;
 
+  const availableColors = getAvailableColors(product);
+  const availableSizes = getAvailableSizes(product, selectedColor || undefined);
+  const currentStock = selectedSize && selectedColor ? getStock(product, selectedSize, selectedColor) : 0;
+  const displayImages = getProductImages(product, selectedColor || undefined);
+
   const handleAddToCart = () => {
     if (!selectedSize) { showNotification('اختر المقاس أولاً', 'error'); return; }
     if (!selectedColor) { showNotification('اختر اللون أولاً', 'error'); return; }
+    if (currentStock <= 0) { showNotification('المنتج نفد من المخزون', 'error'); return; }
     addToCart(product, selectedSize, selectedColor, quantity);
     showNotification(`تمت إضافة "${product.name}" للسلة ✓`);
     useStore.getState().setIsCartOpen(true);
@@ -66,13 +72,13 @@ export default function ProductDetailPage({ productId }: Props) {
               animate={{ opacity: 1 }}
               className="relative aspect-square bg-gray-100 rounded-3xl overflow-hidden"
             >
-              <img src={product.images[imgIndex]} alt={product.name} className="w-full h-full object-cover" />
+              <img src={displayImages[imgIndex] || displayImages[0] || product.images[0]} alt={product.name} className="w-full h-full object-cover" />
               {discount > 0 && (
                 <span className="absolute top-4 right-4 px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-xl font-cairo">
                   -{discount}%
                 </span>
               )}
-              {product.images.length > 1 && (
+              {displayImages.length > 1 && (
                 <>
                   <button
                     onClick={() => setImgIndex(i => Math.max(0, i - 1))}
@@ -81,7 +87,7 @@ export default function ProductDetailPage({ productId }: Props) {
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => setImgIndex(i => Math.min(product.images.length - 1, i + 1))}
+                    onClick={() => setImgIndex(i => Math.min(displayImages.length - 1, i + 1))}
                     className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center shadow-md hover:bg-white transition-all"
                   >
                     <ChevronRight className="w-5 h-5" />
@@ -89,9 +95,9 @@ export default function ProductDetailPage({ productId }: Props) {
                 </>
               )}
             </motion.div>
-            {product.images.length > 1 && (
+            {displayImages.length > 1 && (
               <div className="flex gap-3">
-                {product.images.map((img, i) => (
+                {displayImages.map((img, i) => (
                   <button
                     key={i}
                     onClick={() => setImgIndex(i)}
@@ -110,9 +116,15 @@ export default function ProductDetailPage({ productId }: Props) {
               <span className="text-sm text-pink-500 font-cairo font-medium">{product.category}</span>
               <h1 className="text-3xl font-black text-gray-900 font-cairo mt-1">{product.name}</h1>
               <div className="flex items-center gap-3 mt-3">
-                <span className={`text-sm font-cairo font-medium ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  {product.stock > 0 ? `✓ متاح (${product.stock} قطعة)` : '✗ نفد المخزون'}
-                </span>
+                {selectedSize && selectedColor ? (
+                  <span className={`text-sm font-cairo font-medium ${currentStock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {currentStock > 0 ? `✓ متاح (${currentStock} قطعة)` : '✗ نفد المخزون لهذا المقاس واللون'}
+                  </span>
+                ) : (
+                  <span className="text-sm font-cairo font-medium text-gray-500">
+                    اختر المقاس واللون لمعرفة التوفر
+                  </span>
+                )}
               </div>
             </div>
 
@@ -131,10 +143,10 @@ export default function ProductDetailPage({ productId }: Props) {
             <div>
               <p className="text-sm font-semibold text-gray-700 font-cairo mb-2">اللون:</p>
               <div className="flex gap-3 flex-wrap">
-                {product.colors.map(c => (
+                {availableColors.map(c => (
                   <button
                     key={c}
-                    onClick={() => setSelectedColor(c)}
+                    onClick={() => { setSelectedColor(c); setImgIndex(0); }}
                     className={`flex flex-col items-center gap-1 transition-all ${
                       selectedColor === c ? 'scale-110' : 'opacity-70 hover:opacity-100'
                     }`}
@@ -151,6 +163,9 @@ export default function ProductDetailPage({ productId }: Props) {
                     </span>
                   </button>
                 ))}
+                {availableColors.length === 0 && (
+                  <span className="text-sm text-red-500 font-cairo">لا توجد ألوان متاحة</span>
+                )}
               </div>
             </div>
 
@@ -158,19 +173,35 @@ export default function ProductDetailPage({ productId }: Props) {
             <div>
               <p className="text-sm font-semibold text-gray-700 font-cairo mb-2">المقاس:</p>
               <div className="flex gap-2 flex-wrap">
-                {product.sizes.map(size => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold font-cairo border-2 transition-all ${
-                      selectedSize === size
-                        ? 'bg-pink-500 text-white border-pink-500'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-pink-300'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
+                {selectedColor ? (
+                  availableSizes.length > 0 ? availableSizes.map(size => (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold font-cairo border-2 transition-all ${
+                        selectedSize === size
+                          ? 'bg-pink-500 text-white border-pink-500'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-pink-300'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  )) : <span className="text-sm text-red-500 font-cairo">لا توجد مقاسات متاحة لهذا اللون</span>
+                ) : (
+                  product.sizes.map(size => (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold font-cairo border-2 transition-all ${
+                        selectedSize === size
+                          ? 'bg-pink-500 text-white border-pink-500'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-pink-300'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -186,11 +217,14 @@ export default function ProductDetailPage({ productId }: Props) {
                 </button>
                 <span className="text-xl font-bold font-cairo w-8 text-center">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
+                  onClick={() => setQuantity(q => Math.min(currentStock || 1, q + 1))}
                   className="w-10 h-10 border border-pink-200 bg-pink-50 rounded-xl flex items-center justify-center hover:bg-pink-100 transition-all text-pink-600"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
+                {selectedSize && selectedColor && currentStock > 0 && (
+                  <span className="text-xs text-gray-400 font-cairo">({currentStock} متاح)</span>
+                )}
               </div>
             </div>
 
@@ -200,11 +234,11 @@ export default function ProductDetailPage({ productId }: Props) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={currentStock === 0 || !selectedSize || !selectedColor}
                 className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white py-4 rounded-2xl font-bold font-cairo text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingCart className="w-5 h-5" />
-                {product.stock === 0 ? 'نفد المخزون' : 'أضف للسلة'}
+                {currentStock === 0 ? 'نفد المخزون' : !selectedSize || !selectedColor ? 'اختر المقاس واللون' : 'أضف للسلة'}
               </motion.button>
               <button
                 onClick={() => {

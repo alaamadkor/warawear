@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowLeft, Tag, Check, X as XIcon } from 'lucide-react';
-import { useStore, getColorLabel } from '../store/useStore';
+import { useStore, getColorLabel, getProductImages } from '../store/useStore';
 
 export default function Cart() {
   const {
@@ -79,7 +79,7 @@ export default function Cart() {
                       className="flex gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100"
                     >
                       <img
-                        src={item.product.images[0]}
+                        src={getProductImages(item.product, item.color)[0] || item.product.images[0]}
                         alt={item.product.name}
                         className="w-16 h-20 object-cover rounded-lg flex-shrink-0"
                       />

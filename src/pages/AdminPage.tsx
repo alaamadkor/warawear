@@ -6,7 +6,7 @@ import {
   BarChart2, DollarSign, ShoppingCart, UserCheck, TrendingUp, Settings, Smartphone,
   Bell, Image as ImageIcon, ArrowUp, ArrowDown, RefreshCw, Save, Download, Edit3
 } from 'lucide-react';
-import { useStore, Product, Order, COLOR_NAMES } from '../store/useStore';
+import { useStore, Product, Order, COLOR_NAMES, getTotalStock } from '../store/useStore';
 import { saveCustomersToFirestore } from '../lib/ordersService';
 
 
@@ -41,7 +41,8 @@ const emptyProduct = {
   colors: ['#000000'],
   colorLabels: {} as Record<string, string>,
   description: '',
-  stock: 0,
+  stock: {} as Record<string, number>,
+  colorImages: {} as Record<string, string[]>,
   featured: false,
   newArrival: false,
   images: ['https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=600'],
@@ -134,7 +135,7 @@ export default function AdminPage() {
   // Stats
   const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((a, o) => a + o.total, 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
-  const lowStock = products.filter(p => p.stock < 5 && p.stock > 0).length;
+  const lowStock = products.filter(p => { const t = getTotalStock(p); return t < 5 && t > 0; }).length;
   const totalCustomers = users.filter(u => u.role === 'customer').length + customers.length;
 
   const handleSaveProduct = () => {
@@ -177,7 +178,8 @@ export default function AdminPage() {
       colors: p.colors,
       colorLabels: p.colorLabels || {},
       description: p.description,
-      stock: p.stock,
+      stock: { ...p.stock },
+      colorImages: { ...(p.colorImages || {}) },
       featured: p.featured,
       newArrival: p.newArrival,
       images: p.images,
@@ -391,11 +393,11 @@ export default function AdminPage() {
                   <h2 className="font-black text-orange-800 font-cairo">منتجات مخزونها منخفض</h2>
                 </div>
                 <div className="space-y-2">
-                  {products.filter(p => p.stock < 5 && p.stock > 0).map(p => (
+                  {products.filter(p => { const t = getTotalStock(p); return t < 5 && t > 0; }).map(p => (
                     <div key={p.id} className="flex items-center justify-between">
                       <p className="text-sm font-cairo text-orange-700">{p.name}</p>
                       <span className="text-xs font-bold text-orange-600 font-cairo bg-orange-100 px-2 py-0.5 rounded-full">
-                        {p.stock} قطعة متبقية
+                        {getTotalStock(p)} قطعة متبقية
                       </span>
                     </div>
                   ))}
@@ -474,9 +476,9 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs font-bold font-cairo px-2 py-1 rounded-full ${
-                            p.stock === 0 ? 'bg-red-100 text-red-700' : p.stock < 5 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                            getTotalStock(p) === 0 ? 'bg-red-100 text-red-700' : getTotalStock(p) < 5 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
                           }`}>
-                            {p.stock === 0 ? 'نفد' : `${p.stock} قطعة`}
+                            {getTotalStock(p) === 0 ? 'نفد' : `${getTotalStock(p)} قطعة`}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -1768,7 +1770,7 @@ export default function AdminPage() {
                   {modalType === 'products' && (() => {
                     const catCount = new Map<string, number>();
                     products.forEach(p => { catCount.set(p.category, (catCount.get(p.category) || 0) + 1); });
-                    const lowStockItems = products.filter(p => p.stock !== undefined && p.stock <= 5);
+                    const lowStockItems = products.filter(p => { const t = getTotalStock(p); return t > 0 && t <= 5; });
                     return (
                       <div className="space-y-3 font-cairo">
                         <div className="bg-blue-50 rounded-xl p-4 text-center">
@@ -1788,7 +1790,7 @@ export default function AdminPage() {
                             {lowStockItems.map(p => (
                               <div key={p.id} className="flex items-center justify-between bg-red-50 rounded-xl p-3">
                                 <span className="text-sm font-bold">{p.name}</span>
-                                <span className="text-sm font-bold text-red-600">متبقي {p.stock}</span>
+                                <span className="text-sm font-bold text-red-600">متبقي {getTotalStock(p)}</span>
                               </div>
                             ))}
                           </>
@@ -2044,11 +2046,6 @@ export default function AdminPage() {
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">المخزون *</label>
-                      <input type="number" value={productForm.stock} onChange={e => setProductForm(f => ({ ...f, stock: Number(e.target.value) }))}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" />
-                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">المقاسات *</label>
@@ -2086,6 +2083,70 @@ export default function AdminPage() {
                       ))}
                     </div>
                   </div>
+                  {productForm.sizes.length > 0 && productForm.colors.length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">المخزون لكل مقاس ولون</label>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm font-cairo border border-gray-200 rounded-xl overflow-hidden">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-right text-xs font-bold text-gray-500">مقاس \ لون</th>
+                              {productForm.colors.map((c, ci) => (
+                                <th key={ci} className="px-3 py-2 text-center">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span className="w-5 h-5 rounded-full border border-gray-300" style={{ backgroundColor: c }} />
+                                    <span className="text-[10px] text-gray-500">{productForm.colorLabels?.[c] || COLOR_NAMES[c] || c}</span>
+                                  </div>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {productForm.sizes.map(size => (
+                              <tr key={size} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-bold text-gray-700 whitespace-nowrap">{size}</td>
+                                {productForm.colors.map((c, ci) => {
+                                  const key = `${size}|${c}`;
+                                  return (
+                                    <td key={ci} className="px-2 py-1.5 text-center">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={productForm.stock[key] ?? 0}
+                                        onChange={e => setProductForm(f => ({
+                                          ...f,
+                                          stock: { ...f.stock, [key]: Math.max(0, Number(e.target.value)) }
+                                        }))}
+                                        className="w-16 text-center border border-gray-200 rounded-lg px-1 py-1 text-xs font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300"
+                                      />
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2">
+                        <button type="button" onClick={() => {
+                          const val = parseInt(prompt('قيمة المخزون لكل مقاس/لون:') || '0', 10);
+                          if (isNaN(val) || val < 0) return;
+                          const newStock = { ...productForm.stock };
+                          for (const s of productForm.sizes) {
+                            for (const c of productForm.colors) {
+                              newStock[`${s}|${c}`] = val;
+                            }
+                          }
+                          setProductForm(f => ({ ...f, stock: newStock }));
+                        }} className="text-xs text-pink-600 font-cairo hover:text-pink-700 font-bold">
+                          تعبئة الكل بقيمة واحدة
+                        </button>
+                        <span className="text-xs text-gray-400 font-cairo">
+                          الإجمالي: {Object.values(productForm.stock).reduce((a, b) => a + (b || 0), 0)} قطعة
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">صور المنتج *</label>
                     <div className="space-y-2">
@@ -2160,6 +2221,48 @@ export default function AdminPage() {
                       ))}
                     </div>
                   </div>
+                  {productForm.colors.length > 0 && productForm.images.filter(Boolean).length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">ربط الصور بالألوان</label>
+                      <p className="text-xs text-gray-400 font-cairo mb-3"> اختار ايه هي الصور اللي بتظهر لما المستخدم يضغط على لون معين</p>
+                      <div className="space-y-3">
+                        {productForm.colors.map((c, ci) => (
+                          <div key={ci} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="w-5 h-5 rounded-full border border-gray-300" style={{ backgroundColor: c }} />
+                              <span className="text-xs font-bold font-cairo text-gray-700">{productForm.colorLabels?.[c] || COLOR_NAMES[c] || c}</span>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              {productForm.images.filter(Boolean).map((img, imgIdx) => {
+                                const isSelected = productForm.colorImages?.[c]?.includes(img) || false;
+                                return (
+                                  <button
+                                    key={imgIdx}
+                                    type="button"
+                                    onClick={() => {
+                                      setProductForm(f => {
+                                        const current = f.colorImages?.[c] || [];
+                                        const updated = isSelected
+                                          ? current.filter(url => url !== img)
+                                          : [...current, img];
+                                        return { ...f, colorImages: { ...f.colorImages, [c]: updated } };
+                                      });
+                                    }}
+                                    className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                                      isSelected ? 'border-pink-500 shadow-md' : 'border-gray-200 opacity-50 hover:opacity-80'
+                                    }`}
+                                  >
+                                    <img src={img} alt="" className="w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+                                    {isSelected && <span className="absolute bottom-0 left-0 right-0 bg-pink-500 text-white text-[8px] text-center font-bold py-0.5">✓</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">الألوان المتاحة *</label>
                     <div className="flex gap-2 flex-wrap mb-3">

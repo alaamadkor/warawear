@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, Grid, List, X, ChevronDown } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { getTotalStock } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
 
 const CATEGORIES: { value: string; label: string }[] = [
@@ -31,7 +32,7 @@ export default function ShopPage() {
     let list = [...products];
     if (selectedCategory !== 'الكل') list = list.filter(p => p.category === selectedCategory);
     if (searchQuery) list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    list = list.filter(p => p.stock > 0 && p.price >= priceRange[0] && p.price <= priceRange[1]);
+    list = list.filter(p => getTotalStock(p) > 0 && p.price >= priceRange[0] && p.price <= priceRange[1]);
     if (selectedSizes.length > 0) list = list.filter(p => p.sizes.some(s => selectedSizes.includes(s)));
     if (onSaleOnly) list = list.filter(p => p.oldPrice);
     if (newOnly) list = list.filter(p => p.newArrival);
@@ -112,7 +113,7 @@ export default function ShopPage() {
 
           {/* Category Tabs */}
           <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
-            {CATEGORIES.filter(c => c.value === 'الكل' || products.some(p => p.category === c.value && p.stock > 0)).map(cat => (
+            {CATEGORIES.filter(c => c.value === 'الكل' || products.some(p => p.category === c.value && getTotalStock(p) > 0)).map(cat => (
               <button
                 key={cat.value}
                 onClick={() => setSelectedCategory(cat.value)}

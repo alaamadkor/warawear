@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Truck, Shield, HeadphonesIcon, TrendingUp, Tag, Zap, Package } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { getTotalStock } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
 import logoSrc from '../assets/logo.jpeg';
 
@@ -10,7 +11,7 @@ export default function HomePage() {
 
   const heroSlides = useMemo(() => {
     const slides = products
-      .filter(p => p.images.length > 0 && p.stock > 0)
+      .filter(p => p.images.length > 0 && getTotalStock(p) > 0)
       .flatMap(p => p.images.map(url => ({ url, productId: p.id, productName: p.name, productPrice: p.price, productOldPrice: p.oldPrice })));
     for (let i = slides.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -35,17 +36,17 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [heroSlides.length]);
 
-  const featured = products.filter(p => p.featured && p.stock > 0).slice(0, 4);
-  const newArrivals = products.filter(p => p.newArrival && p.stock > 0).slice(0, 4);
+  const featured = products.filter(p => p.featured && getTotalStock(p) > 0).slice(0, 4);
+  const newArrivals = products.filter(p => p.newArrival && getTotalStock(p) > 0).slice(0, 4);
 
   const categories = [
-    { name: 'رجالي', emoji: '👔', color: 'from-blue-400 to-blue-600', count: products.filter(p => p.category === 'رجالي' && p.stock > 0).length },
-    { name: 'حريمي', emoji: '👗', color: 'from-pink-400 to-pink-600', count: products.filter(p => p.category === 'حريمي' && p.stock > 0).length },
-    { name: 'أطفال', emoji: '🧒', color: 'from-yellow-400 to-orange-500', count: products.filter(p => p.category === 'أطفال' && p.stock > 0).length },
-    { name: 'رياضي', emoji: '🏋️', color: 'from-green-400 to-emerald-600', count: products.filter(p => p.category === 'رياضي' && p.stock > 0).length },
-    { name: 'اكسسوارات', emoji: '👜', color: 'from-purple-400 to-purple-600', count: products.filter(p => p.category === 'اكسسوارات' && p.stock > 0).length },
-    { name: 'عطور', emoji: '🧴', color: 'from-amber-400 to-amber-600', count: products.filter(p => p.category === 'عطور' && p.stock > 0).length },
-    { name: 'مستحضرات تجميل', emoji: '💄', color: 'from-rose-400 to-rose-600', count: products.filter(p => p.category === 'مستحضرات تجميل' && p.stock > 0).length },
+    { name: 'رجالي', emoji: '👔', color: 'from-blue-400 to-blue-600', count: products.filter(p => p.category === 'رجالي' && getTotalStock(p) > 0).length },
+    { name: 'حريمي', emoji: '👗', color: 'from-pink-400 to-pink-600', count: products.filter(p => p.category === 'حريمي' && getTotalStock(p) > 0).length },
+    { name: 'أطفال', emoji: '🧒', color: 'from-yellow-400 to-orange-500', count: products.filter(p => p.category === 'أطفال' && getTotalStock(p) > 0).length },
+    { name: 'رياضي', emoji: '🏋️', color: 'from-green-400 to-emerald-600', count: products.filter(p => p.category === 'رياضي' && getTotalStock(p) > 0).length },
+    { name: 'اكسسوارات', emoji: '👜', color: 'from-purple-400 to-purple-600', count: products.filter(p => p.category === 'اكسسوارات' && getTotalStock(p) > 0).length },
+    { name: 'عطور', emoji: '🧴', color: 'from-amber-400 to-amber-600', count: products.filter(p => p.category === 'عطور' && getTotalStock(p) > 0).length },
+    { name: 'مستحضرات تجميل', emoji: '💄', color: 'from-rose-400 to-rose-600', count: products.filter(p => p.category === 'مستحضرات تجميل' && getTotalStock(p) > 0).length },
   ];
 
   const featuresMap: Record<string, { icon: React.ReactNode; color: string }> = {
@@ -307,7 +308,7 @@ export default function HomePage() {
           </button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {products.filter(p => p.stock > 0).map((p, i) => (
+          {products.filter(p => getTotalStock(p) > 0).map((p, i) => (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 30 }}
@@ -319,7 +320,7 @@ export default function HomePage() {
             </motion.div>
           ))}
         </div>
-        {products.filter(p => p.stock > 0).length === 0 && (
+        {products.filter(p => getTotalStock(p) > 0).length === 0 && (
           <p className="text-center text-gray-400 font-cairo py-10">لا توجد منتجات متاحة</p>
         )}
       </section>

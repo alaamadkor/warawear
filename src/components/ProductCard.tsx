@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingCart, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useStore, Product, getColorLabel } from '../store/useStore';
+import { useStore, Product, getColorLabel, getTotalStock } from '../store/useStore';
 
 interface Props {
   product: Product;
@@ -16,6 +16,7 @@ export default function ProductCard({ product }: Props) {
   const discount = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
     : 0;
+  const totalStock = getTotalStock(product);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,12 +86,12 @@ export default function ProductCard({ product }: Props) {
               جديد
             </span>
           )}
-          {product.stock < 5 && product.stock > 0 && (
+          {totalStock < 5 && totalStock > 0 && (
             <span className="px-2 py-1 bg-orange-500 text-white text-xs font-bold rounded-lg font-cairo">
-              آخر {product.stock}
+              آخر {totalStock}
             </span>
           )}
-          {product.stock === 0 && (
+          {totalStock === 0 && (
             <span className="px-2 py-1 bg-gray-500 text-white text-xs font-bold rounded-lg font-cairo">
               نفد
             </span>
@@ -122,11 +123,11 @@ export default function ProductCard({ product }: Props) {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: hovered ? 0 : 20, opacity: hovered ? 1 : 0 }}
           onClick={handleAddToCart}
-          disabled={product.stock === 0}
+          disabled={totalStock === 0}
           className="absolute bottom-3 left-3 right-3 bg-gray-900 text-white py-2 rounded-xl text-xs font-bold font-cairo flex items-center justify-center gap-2 hover:bg-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ShoppingCart className="w-4 h-4" />
-          {product.stock === 0 ? 'نفد المخزون' : 'أضف للسلة'}
+          {totalStock === 0 ? 'نفد المخزون' : 'أضف للسلة'}
         </motion.button>
       </div>
 
