@@ -143,28 +143,34 @@ export default function AdminPage() {
       showNotification('من فضلك اكمل البيانات المطلوبة', 'error');
       return;
     }
-    if (editingProductId) {
-      handleUpdateProduct({
-        ...productForm,
-        id: editingProductId,
-        rating: products.find(p => p.id === editingProductId)?.rating || 0,
-        reviews: products.find(p => p.id === editingProductId)?.reviews || [],
-        createdAt: products.find(p => p.id === editingProductId)?.createdAt || new Date().toISOString().split('T')[0],
-      } as Product);
-      showNotification('تم تحديث المنتج بنجاح ✓');
-    } else {
-      handleAddProduct({
-        ...productForm,
-        id: `prod-${Date.now()}`,
-        rating: 0,
-        reviews: [],
-        createdAt: new Date().toISOString().split('T')[0],
-      } as Product);
-      showNotification('تم إضافة المنتج بنجاح ✓');
+    try {
+      const cleaned = Object.fromEntries(
+        Object.entries(productForm).filter(([_, v]) => v !== undefined)
+      ) as typeof productForm;
+      if (editingProductId) {
+        handleUpdateProduct({
+          ...cleaned,
+          id: editingProductId,
+          rating: products.find(p => p.id === editingProductId)?.rating || 0,
+          reviews: products.find(p => p.id === editingProductId)?.reviews || [],
+          createdAt: products.find(p => p.id === editingProductId)?.createdAt || new Date().toISOString().split('T')[0],
+        } as Product);
+        showNotification('تم تحديث المنتج بنجاح ✓');
+      } else {
+        handleAddProduct({
+          ...cleaned,
+          id: `prod-${Date.now()}`,
+          rating: 0,
+          reviews: [],
+          createdAt: new Date().toISOString().split('T')[0],
+        } as Product);
+        showNotification('تم إضافة المنتج بنجاح ✓');
+      }
+    } finally {
+      setShowProductModal(false);
+      setEditingProductId(null);
+      setProductForm({ ...emptyProduct });
     }
-    setShowProductModal(false);
-    setEditingProductId(null);
-    setProductForm({ ...emptyProduct });
   };
 
   const handleEditProduct = (p: Product) => {
