@@ -45,7 +45,7 @@ const emptyProduct = {
   colorImages: {} as Record<string, string[]>,
   featured: false,
   newArrival: false,
-  images: ['https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=600'],
+  images: [] as string[],
 };
 
 export default function AdminPage() {
