@@ -2712,9 +2712,25 @@ export default function AdminPage() {
             <>
               <style>{`
                 @media print {
+                  @page { size: auto; margin: 8mm; }
                   body * { visibility: hidden !important; }
                   #print-slip, #print-slip * { visibility: visible !important; }
-                  #print-slip { position: absolute !important; inset: 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; }
+                  #print-slip {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    bottom: auto !important;
+                    transform: none !important;
+                    width: auto !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    margin: 0 !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                  }
                 }
               `}</style>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
