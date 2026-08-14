@@ -16,6 +16,10 @@ export default function Cart() {
     (a, i) => a + ((i.product.oldPrice || i.product.price) - i.product.price) * i.quantity, 0
   );
   const total = appliedCoupon ? subtotal - appliedCoupon.discount : subtotal;
+  const shippingCost = siteSettings.shippingCost ?? 50;
+  const freeShippingThreshold = siteSettings.freeShippingThreshold ?? 500;
+  const shipping = total >= freeShippingThreshold ? 0 : shippingCost;
+  const grandTotal = total + shipping;
 
   return (
     <AnimatePresence>
@@ -189,9 +193,25 @@ export default function Cart() {
                     <span className="font-bold">-{appliedCoupon.discount.toLocaleString()} ج</span>
                   </div>
                 )}
+                <div className="flex justify-between text-sm font-cairo">
+                  <span className="text-gray-600">الشحن</span>
+                  <span className={`font-bold ${shipping === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                    {shipping === 0 ? 'مجاني 🎉' : `${shipping} جنيه`}
+                  </span>
+                </div>
+                {shipping > 0 && freeShippingThreshold > 0 && (
+                  <p className="text-xs text-gray-400 font-cairo bg-white rounded-lg px-3 py-2">
+                    🚚 أضف {(freeShippingThreshold - total).toLocaleString()} جنيه للحصول على شحن مجاني
+                  </p>
+                )}
+                {shipping === 0 && freeShippingThreshold > 0 && (
+                  <p className="text-xs text-green-600 font-cairo bg-green-50 rounded-lg px-3 py-2">
+                    🎉 حصلت على شحن مجاني للطلبات من {freeShippingThreshold.toLocaleString()} جنيه فأكثر
+                  </p>
+                )}
                 <div className="flex justify-between font-cairo">
                   <span className="text-gray-600">الإجمالي</span>
-                  <span className="font-bold text-gray-900 text-lg">{Math.max(0, total).toLocaleString()} ج</span>
+                  <span className="font-bold text-gray-900 text-lg">{Math.max(0, grandTotal).toLocaleString()} ج</span>
                 </div>
                 <button
                   onClick={() => { setActivePage('checkout'); setIsCartOpen(false); }}
