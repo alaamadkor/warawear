@@ -4,7 +4,6 @@ import { ArrowLeft, Truck, Shield, HeadphonesIcon, TrendingUp, Tag, Zap, Package
 import { useStore } from '../store/useStore';
 import { getTotalStock } from '../store/useStore';
 import ProductCard from '../components/ProductCard';
-import logoSrc from '../assets/logo.jpeg';
 
 export default function HomePage() {
   const { products, setActivePage, setSelectedCategory, siteSettings } = useStore();
@@ -58,22 +57,15 @@ export default function HomePage() {
     'دعم متواصل': { icon: <HeadphonesIcon className="w-6 h-6" />, color: 'text-purple-500 bg-purple-50' },
   };
 
-  const logoSrcFinal = siteSettings.logoUrl || logoSrc;
-
   return (
     <div className="min-h-screen bg-gray-50" style={{ '--primary': siteSettings.primaryColor, '--secondary': siteSettings.secondaryColor } as React.CSSProperties}>
       {/* Hero Section */}
-      <section className="relative overflow-hidden text-white w-full max-w-full" style={{ background: `linear-gradient(135deg, ${siteSettings.primaryColor}, ${siteSettings.secondaryColor}, #4338ca)` }}>
+      <section className="relative overflow-hidden text-white w-full max-w-full" style={{ background: `linear-gradient(135deg, ${siteSettings.primaryColor}, ${siteSettings.secondaryColor})` }}>
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-10 left-10 w-40 h-40 bg-white rounded-full blur-3xl" />
           <div className="absolute bottom-10 right-20 w-60 h-60 rounded-full blur-3xl" style={{ backgroundColor: siteSettings.primaryColor }} />
           <div className="absolute top-1/2 left-1/2 w-80 h-80 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" style={{ backgroundColor: siteSettings.secondaryColor }} />
         </div>
-        {siteSettings.showHeroWatermark && (
-          <img src={logoSrcFinal} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-            style={{ opacity: 0.06 }}
-          />
-        )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-28 grid md:grid-cols-2 gap-10 items-center w-full overflow-hidden">
           <motion.div
             initial={{ opacity: 0, x: -50 }}
@@ -170,7 +162,7 @@ export default function HomePage() {
       {siteSettings.showFeatures && (
         <section className="bg-white border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {siteSettings.features.map((f, i) => {
+            {siteSettings.features.filter(f => f.visible !== false).map((f, i) => {
               const matched = featuresMap[f.title] || { icon: '💫', color: 'text-gray-500 bg-gray-50' };
               return (
                 <motion.div
@@ -335,11 +327,6 @@ export default function HomePage() {
           className="rounded-3xl p-8 md:p-12 text-white text-center relative overflow-hidden"
           style={{ background: `linear-gradient(to right, ${siteSettings.saleBannerColor}, ${siteSettings.saleBannerColor2})` }}
         >
-          {siteSettings.showSaleWatermark && (
-            <img src={logoSrcFinal} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              style={{ opacity: 0.1 }}
-            />
-          )}
           <div className="relative">
             <span className="inline-flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full text-sm font-cairo mb-4">
               <Tag className="w-4 h-4" /> {siteSettings.saleBannerBadge}

@@ -138,7 +138,7 @@ export interface SiteSettings {
   heroImages: string[];
   instapayName: string;
   vodafoneName: string;
-  features: { title: string; desc: string; emoji: string }[];
+  features: { title: string; desc: string; emoji: string; visible?: boolean }[];
   footerEmail: string;
   footerPhone: string;
   footerAddress: string;
@@ -176,9 +176,6 @@ export interface SiteSettings {
   returnNotifyTemplate: string;
   shippingCost: number;
   freeShippingThreshold: number;
-  showHeroWatermark: boolean;
-  showSaleWatermark: boolean;
-  logoUrl: string;
 }
 
 export const COLOR_NAMES: Record<string, string> = {
@@ -909,14 +906,6 @@ export const useStore = create<StoreState>()(
             ...persisted.siteSettings,
             cancelNotifyTemplate: '💔 إحنا آسفين يا {customerName} ❤️\n\nإحنا استلمنا إلغاء طلبك #{orderId}، وبنعتذرلك بجد لو منتجاتنا معجبتكيش.\n\nوعد مننا إحنا شغالين على تحسين الجودة باستمرار عشان نستاهل ثقتك، ومنورنا في أي وقت 🌹',
             returnNotifyTemplate: '📦 طلب استرجاع جديد #{orderId}\n━━━━━━━━━━━━━━━\n👤 العميل: {customerName}\n📞 التليفون: {customerPhone}\n💰 الإجمالي: {total} ج\n🗒 السبب: {returnReason}\n━━━━━━━━━━━━━━━\n✅ Style It',
-          };
-        }
-        if (persisted.siteSettings?.showHeroWatermark === undefined) {
-          persisted.siteSettings = {
-            ...persisted.siteSettings,
-            showHeroWatermark: true,
-            showSaleWatermark: true,
-            logoUrl: '',
           };
         }
         if (!persisted.siteSettings?.footerQuickLinks) {

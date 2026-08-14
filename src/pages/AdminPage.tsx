@@ -5,7 +5,7 @@ import {
   Edit2, Trash2, Search, Check, X, AlertTriangle, Tag,
   BarChart2, DollarSign, ShoppingCart, UserCheck, TrendingUp, Settings, Smartphone,
   Bell, Image as ImageIcon, ArrowUp, ArrowDown, RefreshCw, Save, Download, Edit3,
-  RotateCcw, XCircle, Undo2, Truck, Printer
+  RotateCcw, XCircle, Undo2, Truck, Printer, Eye, EyeOff
 } from 'lucide-react';
 import { useStore, Product, Order, COLOR_NAMES, getTotalStock } from '../store/useStore';
 import { saveCustomersToFirestore } from '../lib/ordersService';
@@ -1294,19 +1294,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Logo URL */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <h2 className="font-black text-gray-900 font-cairo mb-4 flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-pink-500" /> شعار الموقع
-              </h2>
-              <div>
-                <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">رابط الشعار</label>
-                <input value={stagedSettings.logoUrl || ''} onChange={e => updateStagedSettings({ logoUrl: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300 font-mono" dir="ltr" placeholder="https://example.com/logo.png" />
-                <p className="text-xs text-gray-400 font-cairo mt-1">ضع رابط صورة عشان تغير الشعار. لو سيبه فاضي، هيستخدم الشعار الافتراضي.</p>
-              </div>
-            </div>
-
             {/* All Product Images */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-black text-gray-900 font-cairo mb-4 flex items-center gap-2">
@@ -1496,7 +1483,7 @@ export default function AdminPage() {
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-gray-700 font-cairo block mb-2">مميزات الموقع</label>
                   {stagedSettings.features.map((f, i) => (
-                    <div key={i} className="flex gap-2 mb-2">
+                    <div key={i} className={`flex gap-2 mb-2 ${f.visible === false ? 'opacity-50' : ''}`}>
                       <input value={f.title} onChange={e => {
                         const features = [...stagedSettings.features];
                         features[i] = { ...features[i], title: e.target.value };
@@ -1507,9 +1494,26 @@ export default function AdminPage() {
                         features[i] = { ...features[i], desc: e.target.value };
                         updateStagedSettings({ features });
                       }} placeholder="الوصف" className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" />
-                      <span className="text-2xl">{f.emoji}</span>
+                      <input value={f.emoji} onChange={e => {
+                        const features = [...stagedSettings.features];
+                        features[i] = { ...features[i], emoji: e.target.value };
+                        updateStagedSettings({ features });
+                      }} className="w-12 text-center text-xl border border-gray-200 rounded-xl py-2 font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                      <button type="button" title={f.visible === false ? 'إظهار الميزة' : 'إخفاء الميزة'}
+                        onClick={() => {
+                          const features = [...stagedSettings.features];
+                          features[i] = { ...features[i], visible: f.visible === false ? true : false };
+                          updateStagedSettings({ features });
+                        }}
+                        className={`p-2 rounded-lg transition-all ${f.visible === false ? 'bg-gray-200 text-gray-400' : 'bg-pink-50 text-pink-500 hover:bg-pink-100'}`}>
+                        {f.visible === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   ))}
+                  <button type="button" onClick={() => updateStagedSettings({ features: [...stagedSettings.features, { title: '', desc: '', emoji: '💫', visible: true }] })}
+                    className="flex items-center gap-2 text-sm font-cairo text-pink-500 hover:text-pink-600 transition-all">
+                    <Plus className="w-4 h-4" /> إضافة ميزة
+                  </button>
                 </div>
               </div>
               {/* Quick Links */}
@@ -1874,8 +1878,6 @@ export default function AdminPage() {
                   { key: 'showFeatured', label: 'المنتجات المميزة' },
                   { key: 'showNewArrivals', label: 'وصل حديثاً' },
                   { key: 'showSaleBanner', label: 'بانر التخفيضات' },
-                  { key: 'showHeroWatermark', label: 'شعار مائي في الهيرو' },
-                  { key: 'showSaleWatermark', label: 'شعار مائي في البانر' },
                 ].map(item => (
                   <label key={item.key} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer">
                     <input type="checkbox" checked={siteSettings[item.key as keyof typeof siteSettings] as boolean}
