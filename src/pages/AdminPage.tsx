@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Package, ShoppingBag, Users, Plus,
@@ -221,6 +222,68 @@ export default function AdminPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const orderSlipBody = (order: Order) => {
+    const paymentLabel = order.paymentMethod === 'cash' ? 'الدفع عند الاستلام' : order.paymentMethod === 'instapay' ? 'InstaPay' : order.paymentMethod === 'vodafone' ? 'فودافون كاش' : order.paymentMethod;
+    return (
+      <>
+        <div className="flex items-center justify-between mb-3 pb-3 border-b-2 border-dashed border-gray-300">
+          <div>
+            <p className="text-lg font-black">{siteSettings.footerBrand || 'Style It'}</p>
+            <p className="text-xs text-gray-500">ورقة شحن للطلب</p>
+          </div>
+          <div className="text-left">
+            <p className="text-xs text-gray-500">التاريخ</p>
+            <p className="text-sm font-bold">{order.createdAt}</p>
+          </div>
+        </div>
+        <div className="text-center mb-4">
+          <p className="text-[10px] text-gray-400 mb-1">رقم الطلب</p>
+          <p className="text-3xl font-black tracking-widest" dir="ltr">#{order.id}</p>
+          <div className="mx-auto mt-2 h-10 flex items-end justify-center gap-[2px]" dir="ltr">
+            {Array.from({ length: 40 }).map((_, i) => (
+              <span key={i} className="inline-block w-[2px] bg-gray-900" style={{ height: `${3 + Math.abs(Math.sin(i * 1.7)) * 9}px` }} />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1 text-sm mb-3">
+          <p><span className="text-gray-500">👤 العميل:</span> <span className="font-bold">{order.userName}</span></p>
+          <p><span className="text-gray-500">📞 التليفون:</span> <span className="font-bold" dir="ltr">{order.phone}</span></p>
+          <p><span className="text-gray-500">📍 العنوان:</span> <span className="font-bold">{order.address}</span></p>
+          <p><span className="text-gray-500">💳 الدفع:</span> <span className="font-bold">{paymentLabel}</span></p>
+        </div>
+        <div className="mb-3">
+          <p className="text-xs text-gray-500 mb-1">🛒 المنتجات:</p>
+          <div className="space-y-1">
+            {order.items.map((item, i) => (
+              <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-2 py-1">
+                <span className="font-bold flex-1 min-w-0 truncate">{item.product.name} <span className="text-gray-400 text-xs">({item.size})</span> × {item.quantity}</span>
+                <span className="font-bold">{(item.product.price * item.quantity).toLocaleString()} ج</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="border-t-2 border-dashed border-gray-300 pt-2 space-y-1 text-sm">
+          {order.subtotal !== undefined && (
+            <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{order.subtotal.toLocaleString()} ج</span></div>
+          )}
+          {order.couponCode && (
+            <div className="flex justify-between text-red-500"><span>خصم الكوبون ({order.couponCode})</span><span>-{order.couponDiscount?.toLocaleString()} ج</span></div>
+          )}
+          {order.shipping !== undefined && (
+            <div className="flex justify-between text-gray-600"><span>الشحن</span><span>{order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}</span></div>
+          )}
+          <div className="flex justify-between font-black text-lg pt-1">
+            <span>الإجمالي</span>
+            <span>{order.total.toLocaleString()} ج</span>
+          </div>
+        </div>
+        <p className="text-center text-[10px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
+          {siteSettings.footerBrand || 'Style It'} • {siteSettings.footerPhone || ''}
+        </p>
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex" dir="rtl">
@@ -2707,95 +2770,18 @@ export default function AdminPage() {
         {printOrderId && (() => {
           const order = orders.find(o => o.id === printOrderId);
           if (!order) return null;
-          const paymentLabel = order.paymentMethod === 'cash' ? 'الدفع عند الاستلام' : order.paymentMethod === 'instapay' ? 'InstaPay' : order.paymentMethod === 'vodafone' ? 'فودافون كاش' : order.paymentMethod;
           return (
             <>
-              <style>{`
-                @media print {
-                  @page { size: auto; margin: 8mm; }
-                  body * { visibility: hidden !important; }
-                  #print-slip, #print-slip * { visibility: visible !important; }
-                  #print-slip {
-                    position: fixed !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    right: 0 !important;
-                    bottom: auto !important;
-                    transform: none !important;
-                    width: auto !important;
-                    max-height: none !important;
-                    overflow: visible !important;
-                    margin: 0 !important;
-                    border: none !important;
-                    box-shadow: none !important;
-                    page-break-inside: avoid !important;
-                    break-inside: avoid !important;
-                  }
-                }
-              `}</style>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setPrintOrderId(null)} className="fixed inset-0 bg-black/50 z-50" />
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                 className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-lg bg-white rounded-3xl z-50 overflow-y-auto shadow-2xl" style={{ maxHeight: '90vh' }}>
                 <div className="p-6">
                   {/* Print Preview */}
-                  <div id="print-slip" className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-5 text-gray-900 font-cairo">
-                    <div className="flex items-center justify-between mb-3 pb-3 border-b-2 border-dashed border-gray-300">
-                      <div>
-                        <p className="text-lg font-black">{siteSettings.footerBrand || 'Style It'}</p>
-                        <p className="text-xs text-gray-500">ورقة شحن للطلب</p>
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs text-gray-500">التاريخ</p>
-                        <p className="text-sm font-bold">{order.createdAt}</p>
-                      </div>
-                    </div>
-                    <div className="text-center mb-4">
-                      <p className="text-[10px] text-gray-400 mb-1">رقم الطلب</p>
-                      <p className="text-3xl font-black tracking-widest" dir="ltr">#{order.id}</p>
-                      <div className="mx-auto mt-2 h-10 flex items-end justify-center gap-[2px]" dir="ltr">
-                        {Array.from({ length: 40 }).map((_, i) => (
-                          <span key={i} className="inline-block w-[2px] bg-gray-900" style={{ height: `${3 + Math.abs(Math.sin(i * 1.7)) * 9}px` }} />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-1 text-sm mb-3">
-                      <p><span className="text-gray-500">👤 العميل:</span> <span className="font-bold">{order.userName}</span></p>
-                      <p><span className="text-gray-500">📞 التليفون:</span> <span className="font-bold" dir="ltr">{order.phone}</span></p>
-                      <p><span className="text-gray-500">📍 العنوان:</span> <span className="font-bold">{order.address}</span></p>
-                      <p><span className="text-gray-500">💳 الدفع:</span> <span className="font-bold">{paymentLabel}</span></p>
-                    </div>
-                    <div className="mb-3">
-                      <p className="text-xs text-gray-500 mb-1">🛒 المنتجات:</p>
-                      <div className="space-y-1">
-                        {order.items.map((item, i) => (
-                          <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-2 py-1">
-                            <span className="font-bold flex-1 min-w-0 truncate">{item.product.name} <span className="text-gray-400 text-xs">({item.size})</span> × {item.quantity}</span>
-                            <span className="font-bold">{(item.product.price * item.quantity).toLocaleString()} ج</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="border-t-2 border-dashed border-gray-300 pt-2 space-y-1 text-sm">
-                      {order.subtotal !== undefined && (
-                        <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{order.subtotal.toLocaleString()} ج</span></div>
-                      )}
-                      {order.couponCode && (
-                        <div className="flex justify-between text-red-500"><span>خصم الكوبون ({order.couponCode})</span><span>-{order.couponDiscount?.toLocaleString()} ج</span></div>
-                      )}
-                      {order.shipping !== undefined && (
-                        <div className="flex justify-between text-gray-600"><span>الشحن</span><span>{order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}</span></div>
-                      )}
-                      <div className="flex justify-between font-black text-lg pt-1">
-                        <span>الإجمالي</span>
-                        <span>{order.total.toLocaleString()} ج</span>
-                      </div>
-                    </div>
-                    <p className="text-center text-[10px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
-                      {siteSettings.footerBrand || 'Style It'} • {siteSettings.footerPhone || ''}
-                    </p>
+                  <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-5 text-gray-900 font-cairo">
+                    {orderSlipBody(order)}
                   </div>
-                  <div className="flex gap-3 mt-5 print:hidden">
+                  <div className="flex gap-3 mt-5">
                     <button onClick={() => setPrintOrderId(null)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold font-cairo text-sm hover:bg-gray-200 transition-all">
                       إلغاء
                     </button>
@@ -2805,6 +2791,22 @@ export default function AdminPage() {
                   </div>
                 </div>
               </motion.div>
+              {createPortal(
+                <>
+                  <style>{`
+                    #print-slip-print { display: none; }
+                    @media print {
+                      @page { size: auto; margin: 8mm; }
+                      body > *:not(#print-slip-print) { display: none !important; }
+                      #print-slip-print { display: block !important; }
+                    }
+                  `}</style>
+                  <div id="print-slip-print" className="bg-white p-5 text-gray-900 font-cairo">
+                    {orderSlipBody(order)}
+                  </div>
+                </>,
+                document.body
+              )}
             </>
           );
         })()}
