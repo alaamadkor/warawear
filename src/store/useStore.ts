@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { saveSettings } from '../lib/settingsService';
-import { saveOrderToFirestore, saveUnreadIdsToFirestore, deleteOrderFromFirestore, updateOrderStatusInFirestore, saveCustomersToFirestore } from '../lib/ordersService';
+import { saveOrderToFirestore, saveUnreadIdsToFirestore, deleteOrderFromFirestore, updateOrderStatusInFirestore, updateOrderFieldsInFirestore, saveCustomersToFirestore } from '../lib/ordersService';
 import { saveAllProducts } from '../lib/productsService';
 
 async function syncProducts(products: Product[], showError?: (msg: string) => void) {
@@ -96,11 +96,15 @@ export interface Order {
   userEmail: string;
   items: CartItem[];
   total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
   address: string;
   phone: string;
   createdAt: string;
   paymentMethod: string;
+  cancelReason?: string;
+  returnReason?: string;
+  cancelledBy?: 'customer' | 'admin';
+  statusUpdatedAt?: string;
 }
 
 export interface User {
@@ -164,6 +168,8 @@ export interface SiteSettings {
   customerNotifyTemplate: string;
   coupons: Coupon[];
   orderTrackingMessage: string;
+  cancelNotifyTemplate: string;
+  returnNotifyTemplate: string;
   showHeroWatermark: boolean;
   showSaleWatermark: boolean;
   logoUrl: string;
@@ -244,6 +250,8 @@ interface StoreState {
   unreadOrderIds: string[];
   placeOrder: (order: Omit<Order, 'id' | 'createdAt'>) => string;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  cancelOrder: (orderId: string, reason: string) => void;
+  requestReturn: (orderId: string, reason: string) => void;
   markOrdersRead: (orderIds: string[]) => void;
 
   // UI
@@ -529,6 +537,8 @@ export const useStore = create<StoreState>()(
           { code: 'SAVE10', type: 'percentage', value: 10 },
         ],
         orderTrackingMessage: 'شكراً لطلبك من وارا وير! 🎉 طلبك قيد التجهيز وسيتم شحنه قريباً. يمكنك تتبع حالة طلبك من هنا.',
+        cancelNotifyTemplate: '💔 إحنا آسفين يا {customerName} ❤️\n\nإحنا استلمنا إلغاء طلبك #{orderId}، وبنعتذرلك بجد لو منتجاتنا معجبتكيش.\n\nوعد مننا إحنا شغالين على تحسين الجودة باستمرار عشان نستاهل ثقتك، ومنورنا في أي وقت 🌹',
+        returnNotifyTemplate: '📦 طلب استرجاع جديد #{orderId}\n━━━━━━━━━━━━━━━\n👤 العميل: {customerName}\n📞 التليفون: {customerPhone}\n💰 الإجمالي: {total} ج\n🗒 السبب: {returnReason}\n━━━━━━━━━━━━━━━\n✅ Style It',
       },
 
       login: (email, password) => {
@@ -727,6 +737,62 @@ export const useStore = create<StoreState>()(
         updateOrderStatusInFirestore(orderId, status);
       },
 
+      cancelOrder: (orderId, reason) => {
+        const state = get();
+        const order = state.orders.find(o => o.id === orderId);
+        if (!order || order.status === 'cancelled') return;
+        const now = new Date().toISOString();
+        const updated: Order = {
+          ...order,
+          status: 'cancelled',
+          cancelReason: reason,
+          cancelledBy: 'customer',
+          statusUpdatedAt: now,
+        };
+        const products = get().products.map(p => {
+          const orderedItems = order.items.filter(i => i.product.id === p.id);
+          if (orderedItems.length === 0) return p;
+          const newStock = { ...p.stock };
+          for (const item of orderedItems) {
+            const key = stockKey(item.size as string, item.color);
+            newStock[key] = (newStock[key] ?? 0) + item.quantity;
+          }
+          return { ...p, stock: newStock };
+        });
+        set(state => ({
+          orders: state.orders.map(o => o.id === orderId ? updated : o),
+          products,
+          productsUpdatedAt: Date.now(),
+        }));
+        updateOrderFieldsInFirestore(orderId, {
+          status: 'cancelled',
+          cancelReason: reason,
+          cancelledBy: 'customer',
+          statusUpdatedAt: now,
+        });
+        syncProducts(products, get().showNotification);
+      },
+
+      requestReturn: (orderId, reason) => {
+        const state = get();
+        const order = state.orders.find(o => o.id === orderId);
+        if (!order || order.status === 'returned') return;
+        const now = new Date().toISOString();
+        set(state => ({
+          orders: state.orders.map(o =>
+            o.id === orderId
+              ? { ...o, status: 'returned' as const, returnReason: reason, cancelledBy: 'customer' as const, statusUpdatedAt: now }
+              : o
+          ),
+        }));
+        updateOrderFieldsInFirestore(orderId, {
+          status: 'returned',
+          returnReason: reason,
+          cancelledBy: 'customer',
+          statusUpdatedAt: now,
+        });
+      },
+
       setSearchQuery: (q) => set({ searchQuery: q }),
       setSelectedCategory: (cat) => set({ selectedCategory: cat }),
       setActivePage: (page) => set({ activePage: page }),
@@ -805,6 +871,13 @@ export const useStore = create<StoreState>()(
           persisted.siteSettings = {
             ...persisted.siteSettings,
         orderTrackingMessage: 'شكراً لطلبك من وارا وير! 🎉 طلبك قيد التجهيز وسيتم شحنه قريباً. يمكنك تتبع حالة طلبك من هنا.',
+          };
+        }
+        if (!persisted.siteSettings?.cancelNotifyTemplate) {
+          persisted.siteSettings = {
+            ...persisted.siteSettings,
+            cancelNotifyTemplate: '💔 إحنا آسفين يا {customerName} ❤️\n\nإحنا استلمنا إلغاء طلبك #{orderId}، وبنعتذرلك بجد لو منتجاتنا معجبتكيش.\n\nوعد مننا إحنا شغالين على تحسين الجودة باستمرار عشان نستاهل ثقتك، ومنورنا في أي وقت 🌹',
+            returnNotifyTemplate: '📦 طلب استرجاع جديد #{orderId}\n━━━━━━━━━━━━━━━\n👤 العميل: {customerName}\n📞 التليفون: {customerPhone}\n💰 الإجمالي: {total} ج\n🗒 السبب: {returnReason}\n━━━━━━━━━━━━━━━\n✅ Style It',
           };
         }
         if (persisted.siteSettings?.showHeroWatermark === undefined) {

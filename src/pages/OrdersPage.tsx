@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Clock, Truck, CheckCircle, XCircle, ShoppingBag, X, Search } from 'lucide-react';
+import { Package, Clock, Truck, CheckCircle, XCircle, ShoppingBag, X, Search, Undo2, Heart, MessageCircle } from 'lucide-react';
 import { useStore, Order, getColorLabel } from '../store/useStore';
 import { ReactNode } from 'react';
 import { loadAllOrdersFromFirestore } from '../lib/ordersService';
@@ -11,13 +11,22 @@ const STATUS_CONFIG: Record<Order['status'], { label: string; color: string; ico
   shipped: { label: 'تم الشحن', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', icon: <Truck className="w-4 h-4 text-purple-500" /> },
   delivered: { label: 'تم التسليم', color: 'text-green-700', bg: 'bg-green-50 border-green-200', icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
   cancelled: { label: 'ملغي', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: <XCircle className="w-4 h-4 text-red-500" /> },
+  returned: { label: 'طلب استرجاع', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: <Undo2 className="w-4 h-4 text-orange-500" /> },
 };
 
+function fillTemplate(template: string, data: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => data[key] ?? `{${key}}`);
+}
+
 export default function OrdersPage() {
-  const { orders, currentUser, setActivePage, siteSettings } = useStore();
+  const { orders, currentUser, setActivePage, siteSettings, cancelOrder, requestReturn, showNotification } = useStore();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [phoneQuery, setPhoneQuery] = useState('');
   const [searched, setSearched] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+  const [returnTarget, setReturnTarget] = useState<string | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [cancelledOrderId, setCancelledOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAllOrdersFromFirestore().then((remote) => {
@@ -235,6 +244,149 @@ export default function OrdersPage() {
                     <p className="text-sm font-cairo opacity-80">الإجمالي</p>
                     <p className="text-2xl font-black font-cairo">{order.total.toLocaleString()} جنيه</p>
                   </div>
+                  {(order.cancelReason || order.returnReason) && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                      <h3 className="font-bold text-gray-900 font-cairo mb-1">
+                        🗒 سبب {order.status === 'cancelled' ? 'الإلغاء' : 'الاسترجاع'}
+                      </h3>
+                      <p className="text-sm font-cairo text-gray-700">{order.cancelReason || order.returnReason}</p>
+                      {order.statusUpdatedAt && (
+                        <p className="text-xs text-gray-400 font-cairo mt-1">{new Date(order.statusUpdatedAt).toLocaleString('ar-EG')}</p>
+                      )}
+                    </div>
+                  )}
+                  {(order.status === 'pending' || order.status === 'processing') && (
+                    <button
+                      onClick={() => { setCancelTarget(order.id); setActionReason(''); }}
+                      className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold font-cairo text-sm hover:bg-red-100 transition-all flex items-center justify-center gap-2 border border-red-100"
+                    >
+                      <XCircle className="w-4 h-4" /> إلغاء الطلب
+                    </button>
+                  )}
+                  {order.status === 'delivered' && (
+                    <button
+                      onClick={() => { setReturnTarget(order.id); setActionReason(''); }}
+                      className="w-full py-3 bg-orange-50 text-orange-600 rounded-xl font-bold font-cairo text-sm hover:bg-orange-100 transition-all flex items-center justify-center gap-2 border border-orange-100"
+                    >
+                      <Undo2 className="w-4 h-4" /> طلب استرجاع
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        );
+      })()}
+    </AnimatePresence>
+
+    {/* Cancel / Return confirmation modal */}
+    <AnimatePresence>
+      {(cancelTarget || returnTarget) && (() => {
+        const isCancel = !!cancelTarget;
+        return (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { setCancelTarget(null); setReturnTarget(null); setActionReason(''); }} className="fixed inset-0 bg-black/50 z-40" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-white rounded-3xl z-50 overflow-hidden shadow-2xl">
+              <div className="p-6">
+                <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: isCancel ? '#fee2e2' : '#ffedd5' }}>
+                  {isCancel ? <XCircle className="w-7 h-7 text-red-500" /> : <Undo2 className="w-7 h-7 text-orange-500" />}
+                </div>
+                <h2 className="text-xl font-black text-gray-900 font-cairo text-center mb-2">
+                  {isCancel ? 'تأكيد إلغاء الطلب' : 'تأكيد طلب الاسترجاع'}
+                </h2>
+                <p className="text-sm text-gray-500 font-cairo text-center mb-4">
+                  {isCancel
+                    ? 'متأسفين إنك عايز تلغي طلبك. قولنا السبب لو تحب، وممكن نساعدك في أي حاجة.'
+                    : 'قادر يساعدنا لو تحب تكتب سبب طلب الاسترجاع.'}
+                </p>
+                <textarea
+                  value={actionReason}
+                  onChange={e => setActionReason(e.target.value)}
+                  rows={3}
+                  placeholder="اكتب السبب (اختياري)..."
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300 resize-none mb-3"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setCancelTarget(null); setReturnTarget(null); setActionReason(''); }}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold font-cairo text-sm hover:bg-gray-200 transition-all"
+                  >
+                    تراجع
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reason = actionReason.trim() || 'بدون سبب';
+                      if (cancelTarget) {
+                        cancelOrder(cancelTarget, reason);
+                        setCancelledOrderId(cancelTarget);
+                        setCancelTarget(null);
+                        setSelectedOrderId(null);
+                        showNotification('تم إلغاء الطلب. إحنا آسفين 💔');
+                      }
+                      if (returnTarget) {
+                        requestReturn(returnTarget, reason);
+                        setReturnTarget(null);
+                        setSelectedOrderId(null);
+                        showNotification('تم إرسال طلب الاسترجاع بنجاح ✓');
+                      }
+                      setActionReason('');
+                    }}
+                    className="flex-1 py-3 text-white rounded-xl font-bold font-cairo text-sm transition-all"
+                    style={{ backgroundColor: isCancel ? '#ef4444' : '#f97316' }}
+                  >
+                    {isCancel ? 'تأكيد الإلغاء' : 'تأكيد الاسترجاع'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        );
+      })()}
+    </AnimatePresence>
+
+    {/* Apology message after cancellation */}
+    <AnimatePresence>
+      {cancelledOrderId && (() => {
+        const order = orders.find(o => o.id === cancelledOrderId);
+        if (!order) return null;
+        const apology = fillTemplate(
+          siteSettings.cancelNotifyTemplate || '💔 إحنا آسفين يا {customerName} ❤️ لو منتجاتنا معجبتكيش، وعد مننا إحنا شغالين على تحسين الجودة.',
+          { orderId: order.id, customerName: order.userName || 'صديقنا', total: order.total.toLocaleString() }
+        );
+        const waNumber = (siteSettings.whatsappNumber || '').replace(/^\+|^00/, '');
+        const waLink = waNumber
+          ? `https://wa.me/${waNumber}?text=${encodeURIComponent(`أهلاً Style It 👋، أنا ${order.userName || ''} — طلبي #${order.id} اتعمل له إلغاء وكنت محتاج أساعدكم.`)}`
+          : null;
+        return (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setCancelledOrderId(null)} className="fixed inset-0 bg-black/50 z-40" />
+            <motion.div initial={{ opacity: 0, scale: 0.8, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-white rounded-3xl z-50 overflow-y-auto shadow-2xl" style={{ maxHeight: '90vh' }}>
+              <div className="p-8 text-center">
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  className="w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-5"
+                  style={{ backgroundColor: '#ffe4e6' }}
+                >
+                  <Heart className="w-10 h-10 text-pink-500 fill-pink-500" />
+                </motion.div>
+                <h2 className="text-2xl font-black text-gray-900 font-cairo mb-2">إحنا آسفين يا {order.userName || 'صديقنا'} 💔</h2>
+                <p className="text-gray-600 font-cairo text-sm leading-relaxed whitespace-pre-line mb-2">{apology}</p>
+                <p className="text-gray-400 font-cairo text-xs mb-6">طلبك #{order.id} اتلغى بنجاح، والمخزون اتضاف تاني تلقائياً.</p>
+                <div className="flex flex-col gap-3">
+                  {waLink && (
+                    <a href={waLink} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 py-3 bg-green-500 text-white rounded-xl font-bold font-cairo text-sm hover:bg-green-600 transition-all">
+                      <MessageCircle className="w-4 h-4" /> كلمنا على واتساب
+                    </a>
+                  )}
+                  <button onClick={() => setCancelledOrderId(null)} className="py-3 bg-gray-100 text-gray-700 rounded-xl font-bold font-cairo text-sm hover:bg-gray-200 transition-all">
+                    تمام، شكراً
+                  </button>
                 </div>
               </div>
             </motion.div>

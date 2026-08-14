@@ -4,13 +4,14 @@ import {
   LayoutDashboard, Package, ShoppingBag, Users, Plus,
   Edit2, Trash2, Search, Check, X, AlertTriangle, Tag,
   BarChart2, DollarSign, ShoppingCart, UserCheck, TrendingUp, Settings, Smartphone,
-  Bell, Image as ImageIcon, ArrowUp, ArrowDown, RefreshCw, Save, Download, Edit3
+  Bell, Image as ImageIcon, ArrowUp, ArrowDown, RefreshCw, Save, Download, Edit3,
+  RotateCcw, XCircle, Undo2
 } from 'lucide-react';
 import { useStore, Product, Order, COLOR_NAMES, getTotalStock } from '../store/useStore';
 import { saveCustomersToFirestore } from '../lib/ordersService';
 
 
-type Section = 'dashboard' | 'products' | 'orders' | 'users' | 'analytics' | 'gallery' | 'settings';
+type Section = 'dashboard' | 'products' | 'orders' | 'users' | 'analytics' | 'gallery' | 'settings' | 'returns';
 
 const CATEGORIES = ['رجالي', 'حريمي', 'أطفال', 'رياضي', 'اكسسوارات', 'عطور', 'مستحضرات تجميل'] as const;
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<Order['status'], string> = {
   shipped: 'تم الشحن',
   delivered: 'تم التسليم',
   cancelled: 'ملغي',
+  returned: 'طلب استرجاع',
 };
 const STATUS_COLORS: Record<Order['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -29,6 +31,7 @@ const STATUS_COLORS: Record<Order['status'], string> = {
   shipped: 'bg-purple-100 text-purple-800',
   delivered: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
+  returned: 'bg-orange-100 text-orange-800',
 };
 
 const emptyProduct = {
@@ -57,6 +60,8 @@ export default function AdminPage() {
   const [orderSearch, setOrderSearch] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [orderFilter, setOrderFilter] = useState<Order['status'] | 'all'>('all');
+  const [returnFilter, setReturnFilter] = useState<'all' | 'cancelled' | 'returned'>('all');
+  const [returnSearch, setReturnSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState('');
@@ -135,6 +140,9 @@ export default function AdminPage() {
   // Stats
   const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((a, o) => a + o.total, 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const returnsCount = orders.filter(o => o.status === 'cancelled' || o.status === 'returned').length;
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled');
+  const returnedOrders = orders.filter(o => o.status === 'returned');
   const lowStock = products.filter(p => { const t = getTotalStock(p); return t < 5 && t > 0; }).length;
   const totalCustomers = users.filter(u => u.role === 'customer').length + customers.length;
 
@@ -200,6 +208,7 @@ export default function AdminPage() {
     { key: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
     { key: 'products', label: 'المنتجات', icon: Package },
     { key: 'orders', label: 'الطلبات', icon: ShoppingBag },
+    { key: 'returns', label: 'المرتجعات والإلغاءات', icon: RotateCcw },
     { key: 'users', label: 'العملاء', icon: Users },
     { key: 'analytics', label: 'التحليلات', icon: BarChart2 },
     { key: 'gallery', label: 'معرض الصور', icon: ImageIcon },
@@ -246,6 +255,9 @@ export default function AdminPage() {
               {item.label}
               {item.key === 'orders' && pendingOrders > 0 && (
                 <span className="mr-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingOrders}</span>
+              )}
+              {item.key === 'returns' && returnsCount > 0 && (
+                <span className="mr-auto bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">{returnsCount}</span>
               )}
             </button>
           ))}
@@ -300,6 +312,9 @@ export default function AdminPage() {
             {item.label}
             {item.key === 'orders' && unreadOrderIds.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-pink-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{unreadOrderIds.length}</span>
+            )}
+            {item.key === 'returns' && returnsCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-orange-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{returnsCount}</span>
             )}
           </button>
         ))}
@@ -543,7 +558,7 @@ export default function AdminPage() {
             </div>
             {/* Filter */}
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled', 'archive'] as const).map(s => (
+              {(['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned', 'archive'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setOrderFilter(s)}
@@ -635,10 +650,149 @@ export default function AdminPage() {
                     <span>📍 {order.address}</span>
                     <span>📞 {order.phone}</span>
                     <span>💳 {order.paymentMethod === 'cash' ? 'كاش عند الاستلام' : order.paymentMethod === 'instapay' ? 'InstaPay' : order.paymentMethod === 'vodafone' ? 'فودافون كاش' : order.paymentMethod}</span>
+                    {(order.cancelReason || order.returnReason) && (
+                      <span className="text-orange-600 font-bold">
+                        🗒 سبب {order.status === 'cancelled' ? 'الإلغاء' : 'الاسترجاع'}: {order.cancelReason || order.returnReason}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
               {filteredOrders.length === 0 && <p className="text-center text-gray-400 font-cairo py-10 bg-white rounded-2xl">لا توجد طلبات</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Returns & Cancellations */}
+        {adminSection === 'returns' && (
+          <div className="space-y-5">
+            <div>
+              <h1 className="text-2xl font-black text-gray-900 font-cairo">المرتجعات والإلغاءات</h1>
+              <p className="text-gray-500 font-cairo text-sm">متابعة طلبات الإلغاء والاسترجاع من العملاء</p>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { title: 'طلبات ملغية', value: cancelledOrders.length, icon: <XCircle className="w-6 h-6" />, color: 'from-red-400 to-red-600', sub: 'من العملاء' },
+                { title: 'طلبات استرجاع', value: returnedOrders.length, icon: <Undo2 className="w-6 h-6" />, color: 'from-orange-400 to-orange-600', sub: 'في انتظار المراجعة' },
+                { title: 'قيمة الإلغاءات', value: `${cancelledOrders.reduce((a, o) => a + o.total, 0).toLocaleString()} ج`, icon: <DollarSign className="w-6 h-6" />, color: 'from-rose-400 to-pink-600', sub: 'مرتجعة للمخزون' },
+                { title: 'إجمالي المرتجعات', value: `${cancelledOrders.length + returnedOrders.length}`, icon: <RotateCcw className="w-6 h-6" />, color: 'from-purple-400 to-purple-600', sub: 'طلبات' },
+              ].map((stat, i) => (
+                <motion.div key={stat.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+                  className={`bg-gradient-to-br ${stat.color} text-white p-5 rounded-2xl shadow-lg`}>
+                  <div className="bg-white/20 p-2 rounded-xl inline-flex mb-2">{stat.icon}</div>
+                  <p className="text-2xl font-black font-cairo">{stat.value}</p>
+                  <p className="text-sm font-bold font-cairo mt-1">{stat.title}</p>
+                  <p className="text-xs text-white/70 font-cairo mt-0.5">{stat.sub}</p>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Filters */}
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { key: 'all', label: 'الكل' },
+                { key: 'cancelled', label: 'ملغية' },
+                { key: 'returned', label: 'استرجاع' },
+              ] as const).map(s => (
+                <button key={s.key} onClick={() => setReturnFilter(s.key)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-cairo font-medium transition-all ${
+                    returnFilter === s.key ? 'bg-pink-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-pink-300'
+                  }`}>
+                  {s.label}
+                  <span className="mr-1 text-xs opacity-70">
+                    ({s.key === 'all' ? cancelledOrders.length + returnedOrders.length : s.key === 'cancelled' ? cancelledOrders.length : returnedOrders.length})
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={returnSearch} onChange={e => setReturnSearch(e.target.value)}
+                placeholder="ابحث بالاسم أو التليفون أو رقم الطلب..."
+                className="w-full pr-10 pl-4 py-2.5 border border-gray-200 rounded-xl text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" />
+            </div>
+
+            <div className="space-y-4">
+              {[...orders]
+                .filter(o => returnFilter === 'all' ? (o.status === 'cancelled' || o.status === 'returned') : o.status === returnFilter)
+                .filter(o => !returnSearch || o.id.includes(returnSearch) || o.phone.includes(returnSearch) || o.userName.includes(returnSearch))
+                .sort((a, b) => (b.statusUpdatedAt || b.createdAt).localeCompare(a.statusUpdatedAt || a.createdAt))
+                .map(order => (
+                <div key={order.id} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${order.status === 'cancelled' ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'}`}>
+                        {order.status === 'cancelled' ? <XCircle className="w-5 h-5" /> : <Undo2 className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <p className="font-black text-gray-900 font-cairo">{order.id}</p>
+                        <p className="text-sm text-gray-400 font-cairo">{order.userName} • 📞 {order.phone}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`text-xs px-3 py-1.5 rounded-full font-cairo font-bold ${STATUS_COLORS[order.status]}`}>
+                        {STATUS_LABELS[order.status]}
+                      </span>
+                      <p className="font-black text-lg font-cairo">{order.total.toLocaleString()} ج</p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-3 mb-3">
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 font-cairo mb-1">🗒 سبب {order.status === 'cancelled' ? 'الإلغاء' : 'الاسترجاع'}</p>
+                      <p className="text-sm font-bold text-gray-800 font-cairo">{order.cancelReason || order.returnReason || 'بدون سبب'}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 font-cairo mb-1">
+                        {order.cancelledBy === 'customer' ? '👤 تم من العميل' : '🛡 تم من الإدارة'}
+                      </p>
+                      <p className="text-sm font-bold text-gray-800 font-cairo">{new Date(order.statusUpdatedAt || order.createdAt).toLocaleString('ar-EG')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {order.items.map(item => (
+                      <div key={`${item.product.id}-${item.size}-${item.color}`} className="flex-shrink-0 flex items-center gap-2 bg-gray-50 rounded-xl p-2">
+                        <img src={item.product.images[0]} alt={item.product.name} className="w-10 h-10 object-cover rounded-lg" />
+                        <div>
+                          <p className="text-xs font-semibold font-cairo text-gray-900 line-clamp-1 max-w-[100px]">{item.product.name}</p>
+                          <p className="text-xs text-gray-400 font-cairo">{item.size} × {item.quantity}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50 flex-wrap gap-3">
+                    <select
+                      value={order.status}
+                      onChange={e => { updateOrderStatus(order.id, e.target.value as Order['status']); showNotification('تم تحديث حالة الطلب ✓'); }}
+                      className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold cursor-pointer ${STATUS_COLORS[order.status]}`}>
+                      {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedOrderId(order.id)}
+                        className="px-4 py-2 bg-pink-50 text-pink-600 rounded-xl font-bold font-cairo text-xs hover:bg-pink-100 transition-all">
+                        عرض التفاصيل
+                      </button>
+                      <button
+                        onClick={() => { if (window.confirm(`حذف الطلب ${order.id}؟`)) { deleteOrder(order.id); showNotification('تم حذف الطلب', 'info'); } }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {cancelledOrders.length + returnedOrders.length === 0 && (
+                <p className="text-center text-gray-400 font-cairo py-10 bg-white rounded-2xl">لا توجد مرتجعات أو إلغاءات حالياً 🎉</p>
+              )}
             </div>
           </div>
         )}
@@ -1589,6 +1743,18 @@ export default function AdminPage() {
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" rows={6} dir="ltr" />
                   <p className="text-xs text-gray-400 font-cairo mt-1">المتغيرات: <span className="font-mono text-blue-500">{'{orderId}'}, {'{customerName}'}, {'{total}'}, {'{paymentMethod}'}, {'{items}'}</span></p>
                 </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">نص رسالة الاعتذار للعميل عند الإلغاء 💔</label>
+                  <textarea value={stagedSettings.cancelNotifyTemplate || ''} onChange={e => updateStagedSettings({ cancelNotifyTemplate: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" rows={6} dir="ltr" />
+                  <p className="text-xs text-gray-400 font-cairo mt-1">تتبعت تلقائياً للعميل لما يلغي طلبه (رسالة حب واعتذار). المتغيرات: <span className="font-mono text-blue-500">{'{orderId}'}, {'{customerName}'}, {'{total}'}</span></p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">نص إشعار الاسترجاع للمسؤول 📦</label>
+                  <textarea value={stagedSettings.returnNotifyTemplate || ''} onChange={e => updateStagedSettings({ returnNotifyTemplate: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" rows={6} dir="ltr" />
+                  <p className="text-xs text-gray-400 font-cairo mt-1">بتتبعت للمسؤول لما العميل يطلب استرجاع. المتغيرات: <span className="font-mono text-blue-500">{'{orderId}'}, {'{customerName}'}, {'{customerPhone}'}, {'{total}'}, {'{returnReason}'}</span></p>
+                </div>
               </div>
             </div>
 
@@ -2404,6 +2570,18 @@ export default function AdminPage() {
                         {Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                       </select>
                     </div>
+                    {(order.cancelReason || order.returnReason) && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                        <h3 className="font-bold text-gray-900 font-cairo mb-1">
+                          🗒 سبب {order.status === 'cancelled' ? 'الإلغاء' : 'الاسترجاع'}
+                        </h3>
+                        <p className="text-sm font-cairo text-gray-700">{order.cancelReason || order.returnReason}</p>
+                        <p className="text-xs text-gray-400 font-cairo mt-1">
+                          {order.cancelledBy === 'customer' ? '👤 تم من العميل' : '🛡 تم من الإدارة'}
+                          {order.statusUpdatedAt && ` • ${new Date(order.statusUpdatedAt).toLocaleString('ar-EG')}`}
+                        </p>
+                      </div>
+                    )}
                     {/* Items */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <h3 className="font-bold text-gray-900 font-cairo mb-3">🛒 المنتجات</h3>

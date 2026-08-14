@@ -12,6 +12,11 @@ export async function updateOrderStatusInFirestore(orderId: string, status: Orde
   await setDoc(docRef, { status }, { merge: true });
 }
 
+export async function updateOrderFieldsInFirestore(orderId: string, fields: Record<string, unknown>): Promise<void> {
+  const docRef = doc(db, 'orders', orderId);
+  await setDoc(docRef, fields, { merge: true });
+}
+
 export async function deleteOrderFromFirestore(orderId: string): Promise<void> {
   await deleteDoc(doc(db, 'orders', orderId));
 }
