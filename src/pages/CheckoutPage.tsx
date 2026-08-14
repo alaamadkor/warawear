@@ -9,7 +9,6 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<'info' | 'payment' | 'success'>('info');
   const [orderId, setOrderId] = useState('');
   const [confirmedTotal, setConfirmedTotal] = useState(0);
-  const [orderItems, setOrderItems] = useState<{ product: { id: string; name: string; price: number; images: string[] }; quantity: number; size: string; color: string }[]>([]);
   const [form, setForm] = useState({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
@@ -20,10 +19,12 @@ export default function CheckoutPage() {
     paymentMethod: 'cash',
   });
 
+  const shippingCost = siteSettings.shippingCost ?? 50;
+  const freeShippingThreshold = siteSettings.freeShippingThreshold ?? 500;
   const subtotal = cart.reduce((a, i) => a + i.product.price * i.quantity, 0);
   const couponDiscount = appliedCoupon?.discount || 0;
   const afterDiscount = subtotal - couponDiscount;
-  const shipping = afterDiscount >= 500 ? 0 : 50;
+  const shipping = afterDiscount >= freeShippingThreshold ? 0 : shippingCost;
   const total = afterDiscount + shipping;
 
   const handleSubmitInfo = (e: React.FormEvent) => {
@@ -41,12 +42,12 @@ export default function CheckoutPage() {
       userName: form.name,
       userEmail: form.email,
       items: cart,
-      total,
       status: 'pending',
       address: `${form.address}, ${form.city}`,
       phone: form.phone,
       paymentMethod: form.paymentMethod,
     });
+    const placedOrder = useStore.getState().orders.find(o => o.id === id);
     // Save customer data
     const info = {
       name: form.name,
@@ -60,13 +61,7 @@ export default function CheckoutPage() {
     };
     useStore.getState().saveCustomer(info);
     setOrderId(id);
-    setConfirmedTotal(total);
-    setOrderItems(cart.map(i => ({
-      product: { id: i.product.id, name: i.product.name, price: i.product.price, images: i.product.images },
-      quantity: i.quantity,
-      size: i.size,
-      color: i.color,
-    })));
+    setConfirmedTotal(placedOrder?.total || total);
     clearCart();
     setStep('success');
     showNotification('تم تقديم طلبك بنجاح! 🎉');
@@ -336,7 +331,7 @@ export default function CheckoutPage() {
                 </div>
                 {couponDiscount > 0 && (
                   <div className="flex justify-between text-sm font-cairo text-red-500">
-                    <span>خصم الكوبون</span>
+                    <span>خصم الكوبون {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
                     <span className="font-bold">-{couponDiscount.toLocaleString()} ج</span>
                   </div>
                 )}
@@ -350,9 +345,14 @@ export default function CheckoutPage() {
                   <span>{total.toLocaleString()} جنيه</span>
                 </div>
               </div>
-              {subtotal < 500 && (
+              {afterDiscount < freeShippingThreshold && (
                 <p className="text-xs text-orange-500 font-cairo mt-3 text-center">
-                  أضف {(500 - subtotal).toLocaleString()} جنيه للحصول على شحن مجاني
+                  أضف {(freeShippingThreshold - afterDiscount).toLocaleString()} جنيه للحصول على شحن مجاني
+                </p>
+              )}
+              {freeShippingThreshold > 0 && (
+                <p className="text-[11px] text-gray-400 font-cairo mt-1 text-center">
+                  🚚 الشحن مجاني للطلبات من {freeShippingThreshold.toLocaleString()} جنيه فأكثر
                 </p>
               )}
             </div>

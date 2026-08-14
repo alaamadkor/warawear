@@ -14,6 +14,10 @@ function fillTemplate(template, data) {
     .replace(/\{paymentMethod\}/g, data.paymentMethod)
     .replace(/\{total\}/g, data.total)
     .replace(/\{items\}/g, data.items)
+    .replace(/\{subtotal\}/g, data.subtotal)
+    .replace(/\{shipping\}/g, data.shipping)
+    .replace(/\{couponCode\}/g, data.couponCode)
+    .replace(/\{couponDiscount\}/g, data.couponDiscount)
     .replace(/\{cancelReason\}/g, data.cancelReason)
     .replace(/\{returnReason\}/g, data.returnReason);
 }
@@ -75,6 +79,10 @@ export const sendOrderToWhatsApp = onDocumentCreated('orders/{orderId}', async (
     paymentMethod: paymentLabel,
     total: (order.total || 0).toLocaleString(),
     items: itemsList,
+    subtotal: (order.subtotal || 0).toLocaleString(),
+    shipping: order.shipping === 0 ? 'مجاني 🎉' : `${(order.shipping || 0)} ج`,
+    couponCode: order.couponCode || '—',
+    couponDiscount: order.couponDiscount ? `-${order.couponDiscount.toLocaleString()} ج` : '—',
   };
 
   // Send to admin
@@ -133,6 +141,10 @@ export const sendOrderStatusNotifications = onDocumentUpdated('orders/{orderId}'
     paymentMethod: paymentLabel,
     total: (after.total || 0).toLocaleString(),
     items: itemsList,
+    subtotal: (after.subtotal || 0).toLocaleString(),
+    shipping: after.shipping === 0 ? 'مجاني 🎉' : `${(after.shipping || 0)} ج`,
+    couponCode: after.couponCode || '—',
+    couponDiscount: after.couponDiscount ? `-${after.couponDiscount.toLocaleString()} ج` : '—',
     cancelReason: after.cancelReason || 'بدون سبب',
     returnReason: after.returnReason || 'بدون سبب',
   };

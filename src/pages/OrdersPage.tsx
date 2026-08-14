@@ -240,6 +240,30 @@ export default function OrdersPage() {
                       ))}
                     </div>
                   </div>
+                  {(order.subtotal !== undefined || order.couponCode || order.shipping !== undefined) && (
+                    <div className="bg-gray-50 rounded-xl p-4 space-y-1.5 text-sm font-cairo text-gray-600">
+                      {order.subtotal !== undefined && (
+                        <div className="flex justify-between">
+                          <span>المجموع الفرعي</span>
+                          <span className="font-bold text-gray-900">{order.subtotal.toLocaleString()} ج</span>
+                        </div>
+                      )}
+                      {order.couponCode && (
+                        <div className="flex justify-between text-red-500">
+                          <span>خصم الكوبون ({order.couponCode})</span>
+                          <span className="font-bold">-{order.couponDiscount?.toLocaleString()} ج</span>
+                        </div>
+                      )}
+                      {order.shipping !== undefined && (
+                        <div className="flex justify-between">
+                          <span>الشحن</span>
+                          <span className={`font-bold ${order.shipping === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                            {order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl p-4 text-center">
                     <p className="text-sm font-cairo opacity-80">الإجمالي</p>
                     <p className="text-2xl font-black font-cairo">{order.total.toLocaleString()} جنيه</p>

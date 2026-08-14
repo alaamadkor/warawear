@@ -5,7 +5,7 @@ import {
   Edit2, Trash2, Search, Check, X, AlertTriangle, Tag,
   BarChart2, DollarSign, ShoppingCart, UserCheck, TrendingUp, Settings, Smartphone,
   Bell, Image as ImageIcon, ArrowUp, ArrowDown, RefreshCw, Save, Download, Edit3,
-  RotateCcw, XCircle, Undo2
+  RotateCcw, XCircle, Undo2, Truck, Printer
 } from 'lucide-react';
 import { useStore, Product, Order, COLOR_NAMES, getTotalStock } from '../store/useStore';
 import { saveCustomersToFirestore } from '../lib/ordersService';
@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [returnFilter, setReturnFilter] = useState<'all' | 'cancelled' | 'returned'>('all');
   const [returnSearch, setReturnSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState('');
   const [newColor, setNewColor] = useState('');
@@ -145,6 +146,7 @@ export default function AdminPage() {
   const returnedOrders = orders.filter(o => o.status === 'returned');
   const lowStock = products.filter(p => { const t = getTotalStock(p); return t < 5 && t > 0; }).length;
   const totalCustomers = users.filter(u => u.role === 'customer').length + customers.length;
+  const isCustomerCancelled = (order: Order) => order.status === 'cancelled' && order.cancelledBy === 'customer';
 
   const handleSaveProduct = () => {
     if (!productForm.name || !productForm.price || productForm.sizes.length === 0) {
@@ -601,16 +603,22 @@ export default function AdminPage() {
                       <p className="text-sm text-gray-400 font-cairo">{order.userName} • {order.userEmail} • {order.createdAt}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <select
-                        value={order.status}
-                        onClick={e => e.stopPropagation()}
-                        onChange={e => { updateOrderStatus(order.id, e.target.value as Order['status']); showNotification('تم تحديث حالة الطلب ✓'); }}
-                        className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold cursor-pointer ${STATUS_COLORS[order.status]}`}
-                      >
-                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
-                        ))}
-                      </select>
+                      {isCustomerCancelled(order) ? (
+                        <span className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold ${STATUS_COLORS[order.status]}`} title="ألغاه العميل">
+                          {STATUS_LABELS[order.status]} 🔒
+                        </span>
+                      ) : (
+                        <select
+                          value={order.status}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { updateOrderStatus(order.id, e.target.value as Order['status']); showNotification('تم تحديث حالة الطلب ✓'); }}
+                          className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold cursor-pointer ${STATUS_COLORS[order.status]}`}
+                        >
+                          {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      )}
                       {siteSettings.whatsappNotificationNumber && (() => {
                         const itemsList = order.items.map(i => `• ${i.product.name} (${i.size} × ${i.quantity}) - ${(i.product.price * i.quantity).toLocaleString()} ج`).join('\n');
                         const paymentLabel = order.paymentMethod === 'cash' ? '💰 كاش عند الاستلام' : order.paymentMethod === 'instapay' ? '💜 InstaPay' : order.paymentMethod === 'vodafone' ? '🔴 فودافون كاش' : order.paymentMethod;
@@ -623,6 +631,13 @@ export default function AdminPage() {
                           </a>
                         );
                       })()}
+                      <button
+                        onClick={e => { e.stopPropagation(); setPrintOrderId(order.id); }}
+                        className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
+                        title="طباعة ورقة الطلب"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={e => { e.stopPropagation(); if (window.confirm(`حذف الطلب ${order.id}؟`)) { deleteOrder(order.id); showNotification('تم حذف الطلب', 'info'); } }}
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -650,6 +665,12 @@ export default function AdminPage() {
                     <span>📍 {order.address}</span>
                     <span>📞 {order.phone}</span>
                     <span>💳 {order.paymentMethod === 'cash' ? 'كاش عند الاستلام' : order.paymentMethod === 'instapay' ? 'InstaPay' : order.paymentMethod === 'vodafone' ? 'فودافون كاش' : order.paymentMethod}</span>
+                    {order.couponCode && (
+                      <span className="text-green-600 font-bold">🏷️ كود خصم {order.couponCode} (-{order.couponDiscount?.toLocaleString()} ج)</span>
+                    )}
+                    {order.shipping !== undefined && (
+                      <span>🚚 الشحن: {order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}</span>
+                    )}
                     {(order.cancelReason || order.returnReason) && (
                       <span className="text-orange-600 font-bold">
                         🗒 سبب {order.status === 'cancelled' ? 'الإلغاء' : 'الاسترجاع'}: {order.cancelReason || order.returnReason}
@@ -767,14 +788,20 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50 flex-wrap gap-3">
-                    <select
-                      value={order.status}
-                      onChange={e => { updateOrderStatus(order.id, e.target.value as Order['status']); showNotification('تم تحديث حالة الطلب ✓'); }}
-                      className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold cursor-pointer ${STATUS_COLORS[order.status]}`}>
-                      {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
+                    {isCustomerCancelled(order) ? (
+                      <span className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold ${STATUS_COLORS[order.status]}`} title="ألغاه العميل">
+                        {STATUS_LABELS[order.status]} 🔒
+                      </span>
+                    ) : (
+                      <select
+                        value={order.status}
+                        onChange={e => { updateOrderStatus(order.id, e.target.value as Order['status']); showNotification('تم تحديث حالة الطلب ✓'); }}
+                        className={`text-sm px-3 py-1.5 rounded-full border font-cairo font-bold cursor-pointer ${STATUS_COLORS[order.status]}`}>
+                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                    )}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setSelectedOrderId(order.id)}
@@ -1710,6 +1737,29 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* Shipping Settings */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <h2 className="font-black text-gray-900 font-cairo mb-4 flex items-center gap-2">
+                <Truck className="w-5 h-5 text-pink-500" /> مصاريف الشحن
+              </h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">مصاريف الشحن (جنيه)</label>
+                  <input type="number" value={stagedSettings.shippingCost ?? 50}
+                    onChange={e => updateStagedSettings({ shippingCost: Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" dir="ltr" />
+                  <p className="text-xs text-gray-400 font-cairo mt-1">المبلغ اللي بيدفعه العميل مقابل التوصيل</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 font-cairo block mb-1">شحن مجاني من (جنيه)</label>
+                  <input type="number" value={stagedSettings.freeShippingThreshold ?? 500}
+                    onChange={e => updateStagedSettings({ freeShippingThreshold: Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-pink-300" dir="ltr" />
+                  <p className="text-xs text-gray-400 font-cairo mt-1">لو قيمة الطلب وصلت للمبلغ ده يبقى الشحن مجاني</p>
+                </div>
+              </div>
+            </div>
+
             {/* واتساب بزنس API */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-black text-gray-900 font-cairo mb-4 flex items-center gap-2">
@@ -2540,7 +2590,12 @@ export default function AdminPage() {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-black text-gray-900 font-cairo">تفاصيل الطلب {order.id}</h2>
-                    <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X className="w-5 h-5" /></button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setPrintOrderId(order.id)} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl font-bold font-cairo text-xs hover:bg-gray-200 transition-all">
+                        <Printer className="w-3.5 h-3.5" /> طباعة
+                      </button>
+                      <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X className="w-5 h-5" /></button>
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {/* Customer Info */}
@@ -2604,11 +2659,128 @@ export default function AdminPage() {
                         ))}
                       </div>
                     </div>
+                    {/* Totals */}
+                    {(order.subtotal !== undefined || order.couponCode || order.shipping !== undefined) && (
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-1.5 text-sm font-cairo text-gray-600">
+                        {order.subtotal !== undefined && (
+                          <div className="flex justify-between">
+                            <span>المجموع الفرعي</span>
+                            <span className="font-bold text-gray-900">{order.subtotal.toLocaleString()} ج</span>
+                          </div>
+                        )}
+                        {order.couponCode && (
+                          <div className="flex justify-between text-red-500">
+                            <span>خصم الكوبون ({order.couponCode})</span>
+                            <span className="font-bold">-{order.couponDiscount?.toLocaleString()} ج</span>
+                          </div>
+                        )}
+                        {order.shipping !== undefined && (
+                          <div className="flex justify-between">
+                            <span>الشحن</span>
+                            <span className={`font-bold ${order.shipping === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                              {order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* Total */}
                     <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl p-4 text-center">
                       <p className="text-sm font-cairo opacity-80">الإجمالي</p>
                       <p className="text-2xl font-black font-cairo">{order.total.toLocaleString()} جنيه</p>
                     </div>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* Print Order Modal */}
+      <AnimatePresence>
+        {printOrderId && (() => {
+          const order = orders.find(o => o.id === printOrderId);
+          if (!order) return null;
+          const paymentLabel = order.paymentMethod === 'cash' ? 'الدفع عند الاستلام' : order.paymentMethod === 'instapay' ? 'InstaPay' : order.paymentMethod === 'vodafone' ? 'فودافون كاش' : order.paymentMethod;
+          return (
+            <>
+              <style>{`
+                @media print {
+                  body * { visibility: hidden !important; }
+                  #print-slip, #print-slip * { visibility: visible !important; }
+                  #print-slip { position: absolute !important; inset: 0 !important; width: 100% !important; margin: 0 !important; box-shadow: none !important; }
+                }
+              `}</style>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setPrintOrderId(null)} className="fixed inset-0 bg-black/50 z-50" />
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-lg bg-white rounded-3xl z-50 overflow-y-auto shadow-2xl" style={{ maxHeight: '90vh' }}>
+                <div className="p-6">
+                  {/* Print Preview */}
+                  <div id="print-slip" className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-5 text-gray-900 font-cairo">
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b-2 border-dashed border-gray-300">
+                      <div>
+                        <p className="text-lg font-black">{siteSettings.footerBrand || 'Style It'}</p>
+                        <p className="text-xs text-gray-500">ورقة شحن للطلب</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs text-gray-500">التاريخ</p>
+                        <p className="text-sm font-bold">{order.createdAt}</p>
+                      </div>
+                    </div>
+                    <div className="text-center mb-4">
+                      <p className="text-[10px] text-gray-400 mb-1">رقم الطلب</p>
+                      <p className="text-3xl font-black tracking-widest" dir="ltr">#{order.id}</p>
+                      <div className="mx-auto mt-2 h-10 flex items-end justify-center gap-[2px]" dir="ltr">
+                        {Array.from({ length: 40 }).map((_, i) => (
+                          <span key={i} className="inline-block w-[2px] bg-gray-900" style={{ height: `${3 + Math.abs(Math.sin(i * 1.7)) * 9}px` }} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-sm mb-3">
+                      <p><span className="text-gray-500">👤 العميل:</span> <span className="font-bold">{order.userName}</span></p>
+                      <p><span className="text-gray-500">📞 التليفون:</span> <span className="font-bold" dir="ltr">{order.phone}</span></p>
+                      <p><span className="text-gray-500">📍 العنوان:</span> <span className="font-bold">{order.address}</span></p>
+                      <p><span className="text-gray-500">💳 الدفع:</span> <span className="font-bold">{paymentLabel}</span></p>
+                    </div>
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-500 mb-1">🛒 المنتجات:</p>
+                      <div className="space-y-1">
+                        {order.items.map((item, i) => (
+                          <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-2 py-1">
+                            <span className="font-bold flex-1 min-w-0 truncate">{item.product.name} <span className="text-gray-400 text-xs">({item.size})</span> × {item.quantity}</span>
+                            <span className="font-bold">{(item.product.price * item.quantity).toLocaleString()} ج</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="border-t-2 border-dashed border-gray-300 pt-2 space-y-1 text-sm">
+                      {order.subtotal !== undefined && (
+                        <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{order.subtotal.toLocaleString()} ج</span></div>
+                      )}
+                      {order.couponCode && (
+                        <div className="flex justify-between text-red-500"><span>خصم الكوبون ({order.couponCode})</span><span>-{order.couponDiscount?.toLocaleString()} ج</span></div>
+                      )}
+                      {order.shipping !== undefined && (
+                        <div className="flex justify-between text-gray-600"><span>الشحن</span><span>{order.shipping === 0 ? 'مجاني 🎉' : `${order.shipping} ج`}</span></div>
+                      )}
+                      <div className="flex justify-between font-black text-lg pt-1">
+                        <span>الإجمالي</span>
+                        <span>{order.total.toLocaleString()} ج</span>
+                      </div>
+                    </div>
+                    <p className="text-center text-[10px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
+                      {siteSettings.footerBrand || 'Style It'} • {siteSettings.footerPhone || ''}
+                    </p>
+                  </div>
+                  <div className="flex gap-3 mt-5 print:hidden">
+                    <button onClick={() => setPrintOrderId(null)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold font-cairo text-sm hover:bg-gray-200 transition-all">
+                      إلغاء
+                    </button>
+                    <button onClick={() => window.print()} className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-bold font-cairo text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                      <Printer className="w-4 h-4" /> طباعة الورقة
+                    </button>
                   </div>
                 </div>
               </motion.div>

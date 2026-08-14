@@ -101,6 +101,10 @@ export interface Order {
   phone: string;
   createdAt: string;
   paymentMethod: string;
+  subtotal?: number;
+  shipping?: number;
+  couponCode?: string;
+  couponDiscount?: number;
   cancelReason?: string;
   returnReason?: string;
   cancelledBy?: 'customer' | 'admin';
@@ -170,6 +174,8 @@ export interface SiteSettings {
   orderTrackingMessage: string;
   cancelNotifyTemplate: string;
   returnNotifyTemplate: string;
+  shippingCost: number;
+  freeShippingThreshold: number;
   showHeroWatermark: boolean;
   showSaleWatermark: boolean;
   logoUrl: string;
@@ -248,7 +254,7 @@ interface StoreState {
   // Orders
   orders: Order[];
   unreadOrderIds: string[];
-  placeOrder: (order: Omit<Order, 'id' | 'createdAt'>) => string;
+  placeOrder: (order: Omit<Order, 'id' | 'createdAt' | 'total' | 'subtotal' | 'shipping' | 'couponCode' | 'couponDiscount'>) => string;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   cancelOrder: (orderId: string, reason: string) => void;
   requestReturn: (orderId: string, reason: string) => void;
@@ -537,6 +543,8 @@ export const useStore = create<StoreState>()(
           { code: 'SAVE10', type: 'percentage', value: 10 },
         ],
         orderTrackingMessage: 'شكراً لطلبك من وارا وير! 🎉 طلبك قيد التجهيز وسيتم شحنه قريباً. يمكنك تتبع حالة طلبك من هنا.',
+        shippingCost: 50,
+        freeShippingThreshold: 500,
         cancelNotifyTemplate: '💔 إحنا آسفين يا {customerName} ❤️\n\nإحنا استلمنا إلغاء طلبك #{orderId}، وبنعتذرلك بجد لو منتجاتنا معجبتكيش.\n\nوعد مننا إحنا شغالين على تحسين الجودة باستمرار عشان نستاهل ثقتك، ومنورنا في أي وقت 🌹',
         returnNotifyTemplate: '📦 طلب استرجاع جديد #{orderId}\n━━━━━━━━━━━━━━━\n👤 العميل: {customerName}\n📞 التليفون: {customerPhone}\n💰 الإجمالي: {total} ج\n🗒 السبب: {returnReason}\n━━━━━━━━━━━━━━━\n✅ Style It',
       },
@@ -677,11 +685,21 @@ export const useStore = create<StoreState>()(
 
       placeOrder: (order) => {
         const id = `${get().orders.length + 1}`;
+        const settings = get().siteSettings;
+        const shippingCost = Number(settings.shippingCost) || 0;
+        const freeThreshold = Number(settings.freeShippingThreshold) || 0;
         const itemsTotal = order.items.reduce((a, i) => a + i.product.price * i.quantity, 0);
-        const shipping = itemsTotal >= 500 ? 0 : 50;
+        const coupon = get().appliedCoupon;
+        const couponDiscount = coupon?.discount || 0;
+        const afterDiscount = itemsTotal - couponDiscount;
+        const shipping = afterDiscount >= freeThreshold ? 0 : shippingCost;
         const newOrder: Order = {
           ...order,
-          total: itemsTotal + shipping,
+          subtotal: itemsTotal,
+          shipping,
+          couponCode: coupon?.code || undefined,
+          couponDiscount: couponDiscount || undefined,
+          total: afterDiscount + shipping,
           id,
           createdAt: new Date().toISOString().split('T')[0],
         };
@@ -731,6 +749,12 @@ export const useStore = create<StoreState>()(
       },
 
       updateOrderStatus: (orderId, status) => {
+        const order = get().orders.find(o => o.id === orderId);
+        if (!order) return;
+        if (order.status === 'cancelled' && order.cancelledBy === 'customer') {
+          get().showNotification('لا يمكن تغيير حالة طلب ألغاه العميل', 'error');
+          return;
+        }
         set(state => ({
           orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o),
         }));
@@ -859,8 +883,15 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'wara-wear-storage',
-      version: 6,
+      version: 7,
       migrate: (persisted: any) => {
+        if (persisted.siteSettings?.shippingCost === undefined) {
+          persisted.siteSettings = {
+            ...persisted.siteSettings,
+            shippingCost: 50,
+            freeShippingThreshold: 500,
+          };
+        }
         if (!persisted.siteSettings?.heroBadge) {
           persisted.siteSettings = {
             ...persisted.siteSettings,

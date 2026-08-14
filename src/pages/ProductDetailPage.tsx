@@ -15,7 +15,6 @@ export default function ProductDetailPage({ productId }: Props) {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [imgIndex, setImgIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'desc'>('desc');
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -141,7 +140,9 @@ export default function ProductDetailPage({ productId }: Props) {
 
             {/* Colors */}
             <div>
-              <p className="text-sm font-semibold text-gray-700 font-cairo mb-2">اللون:</p>
+              <p className={`text-sm font-semibold font-cairo mb-2 ${selectedColor ? 'text-gray-700' : 'text-orange-500'}`}>
+                {selectedColor ? 'اللون:' : 'اختر اللون أولاً'}
+              </p>
               <div className="flex gap-3 flex-wrap">
                 {availableColors.map(c => (
                   <button
@@ -171,7 +172,9 @@ export default function ProductDetailPage({ productId }: Props) {
 
             {/* Sizes */}
             <div>
-              <p className="text-sm font-semibold text-gray-700 font-cairo mb-2">المقاس:</p>
+              <p className={`text-sm font-semibold font-cairo mb-2 ${selectedSize ? 'text-gray-700' : 'text-orange-500'}`}>
+                {selectedSize ? 'المقاس:' : 'اختر المقاس أولاً'}
+              </p>
               <div className="flex gap-2 flex-wrap">
                 {selectedColor ? (
                   availableSizes.length > 0 ? availableSizes.map(size => (
