@@ -225,7 +225,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex" dir="rtl">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex-shrink-0 hidden md:flex flex-col">
+      <aside className="w-64 bg-gray-900 text-white flex-shrink-0 hidden md:flex flex-col self-start sticky top-0 h-screen">
         <div className="p-6 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <div>
@@ -1324,7 +1324,7 @@ export default function AdminPage() {
 
         {/* Settings */}
         {adminSection === 'settings' && (
-          <div className="space-y-6">
+          <div className="space-y-6 pb-32 md:pb-24">
             <h1 className="text-2xl font-black text-gray-900 font-cairo">إعدادات الموقع</h1>
 
             {/* Admin Credentials */}
@@ -1889,19 +1889,22 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Save Button */}
-            <div className="flex justify-center">
-              <button
-            onClick={handleSaveAll}
-                className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-10 py-4 rounded-2xl text-lg font-bold font-cairo shadow-lg hover:shadow-xl transition-all hover:scale-105"
-              >
-                <Save className="w-6 h-6" />
-                حفظ التغييرات
-              </button>
-            </div>
           </div>
         )}
       </main>
+
+      {/* Floating Save Button */}
+      {adminSection === 'settings' && (
+        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={handleSaveAll}
+            className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl text-lg font-bold font-cairo shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105"
+          >
+            <Save className="w-5 h-5" />
+            حفظ التغييرات
+          </button>
+        </div>
+      )}
       <AnimatePresence>
         {statModal && (() => {
           const modalType = statModal.type;
