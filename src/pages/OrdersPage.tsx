@@ -376,7 +376,7 @@ export default function OrdersPage() {
                 </motion.div>
                 <h2 className="text-2xl font-black text-gray-900 font-cairo mb-2">إحنا آسفين يا {order.userName || 'صديقنا'} 💔</h2>
                 <p className="text-gray-600 font-cairo text-sm leading-relaxed whitespace-pre-line mb-2">{apology}</p>
-                <p className="text-gray-400 font-cairo text-xs mb-6">طلبك #{order.id} اتلغى بنجاح، والمخزون اتضاف تاني تلقائياً.</p>
+                <p className="text-gray-400 font-cairo text-xs mb-6">طلبك #{order.id} اتلغى بنجاح.</p>
                 <div className="flex flex-col gap-3">
                   {waLink && (
                     <a href={waLink} target="_blank" rel="noopener noreferrer"
